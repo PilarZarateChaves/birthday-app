@@ -5,16 +5,22 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import type { Party, Guest } from '@/types/database'
-import { GONDOLIERI_MISSIONS } from '@/lib/missions'
+import { GONDOLIERI_ROLES } from '@/lib/missions'
 
 function genCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  in_progress: '🟡 In Progress',
+const MISSION_STATUS_LABEL: Record<string, string> = {
+  in_progress: '🟡 In progress',
   submitted: '🟢 Submitted',
   approved: '🏆 Approved',
+}
+
+const RSVP_LABEL: Record<string, string> = {
+  pending: '⏳ Pending',
+  accepted: '✅ Coming',
+  declined: '❌ Can\'t make it',
 }
 
 export default function HostDashboard({ params }: { params: Promise<{ partyId: string }> }) {
@@ -29,10 +35,9 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     name: '',
     role_name: '',
     role_description: '',
-    mission_title: '',
-    mission_instructions: '',
-    mission_difficulty: 'medium',
-    proof_required: false,
+    mission_easy: '',
+    mission_medium: '',
+    mission_legendary: '',
   })
   const [selectedTemplate, setSelectedTemplate] = useState(-1)
   const [addingGuest, setAddingGuest] = useState(false)
@@ -62,15 +67,14 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   }
 
   function applyTemplate(idx: number) {
-    const t = GONDOLIERI_MISSIONS[idx]
+    const t = GONDOLIERI_ROLES[idx]
     setNewGuest(g => ({
       ...g,
       role_name: t.role_name ?? '',
       role_description: t.role_description ?? '',
-      mission_title: t.mission_title ?? '',
-      mission_instructions: t.mission_instructions ?? '',
-      mission_difficulty: t.mission_difficulty ?? 'medium',
-      proof_required: t.proof_required,
+      mission_easy: t.mission_easy ?? '',
+      mission_medium: t.mission_medium ?? '',
+      mission_legendary: t.mission_legendary ?? '',
     }))
     setSelectedTemplate(idx)
   }
@@ -100,11 +104,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
         photo: photoUrl || null,
         role_name: newGuest.role_name || null,
         role_description: newGuest.role_description || null,
-        mission_title: newGuest.mission_title || null,
-        mission_instructions: newGuest.mission_instructions || null,
-        mission_difficulty: newGuest.mission_difficulty as 'easy' | 'medium' | 'hard',
-        proof_required: newGuest.proof_required,
+        mission_easy: newGuest.mission_easy || null,
+        mission_medium: newGuest.mission_medium || null,
+        mission_legendary: newGuest.mission_legendary || null,
         mission_status: 'in_progress',
+        rsvp_status: 'pending',
+        mission_accepted: false,
         invite_code: code,
         is_host: false,
       })
@@ -112,7 +117,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
       .single()
 
     if (guest) setGuests(g => [...g, guest])
-    setNewGuest({ name: '', role_name: '', role_description: '', mission_title: '', mission_instructions: '', mission_difficulty: 'medium', proof_required: false })
+    setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' })
     setPhotoFile(null)
     setPhotoPreview('')
     setSelectedTemplate(-1)
@@ -158,10 +163,15 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-sm" style={{ color: 'var(--cream)' }}>{guest.name}</p>
-                    <span className="text-xs flex-shrink-0" style={{ color: 'rgba(253,246,227,0.35)' }}>{STATUS_LABEL[guest.mission_status]}</span>
+                    <span className="text-xs flex-shrink-0" style={{ color: 'rgba(253,246,227,0.35)' }}>{RSVP_LABEL[guest.rsvp_status]}</span>
                   </div>
                   <p className="text-xs mt-0.5" style={{ color: 'rgba(201,168,76,0.65)' }}>{guest.role_name}</p>
-                  <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(253,246,227,0.3)' }}>{guest.mission_title}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {guest.mission_accepted && <span className="text-xs" style={{ color: 'rgba(107,190,94,0.7)' }}>✓ Mission accepted</span>}
+                    {!guest.mission_accepted && guest.rsvp_status === 'accepted' && <span className="text-xs" style={{ color: 'rgba(253,246,227,0.2)' }}>Missions not accepted yet</span>}
+                    {guest.mission_status === 'submitted' && <span className="text-xs" style={{ color: 'rgba(201,168,76,0.6)' }}>· {MISSION_STATUS_LABEL['submitted']}</span>}
+                    {guest.mission_status === 'approved' && <span className="text-xs" style={{ color: 'rgba(107,190,94,0.8)' }}>· {MISSION_STATUS_LABEL['approved']}</span>}
+                  </div>
                 </div>
               </div>
 
@@ -245,9 +255,9 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
               {/* Mission templates */}
               <div className="mb-4">
-                <label style={labelStyle}>Quick assign a Society role</label>
+                <label style={labelStyle}>Quick assign a role</label>
                 <div className="flex flex-wrap gap-2">
-                  {GONDOLIERI_MISSIONS.map((m, i) => (
+                  {GONDOLIERI_ROLES.map((m, i) => (
                     <button
                       key={i}
                       type="button"
@@ -276,26 +286,16 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   <textarea value={newGuest.role_description} onChange={e => setNewGuest(g => ({ ...g, role_description: e.target.value }))} rows={2} placeholder="Master of persuasion and questionable truths." className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Mission title</label>
-                  <input value={newGuest.mission_title} onChange={e => setNewGuest(g => ({ ...g, mission_title: e.target.value }))} placeholder="The Legend of Isaac" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+                  <label style={labelStyle}>🟢 Easy mission</label>
+                  <textarea value={newGuest.mission_easy} onChange={e => setNewGuest(g => ({ ...g, mission_easy: e.target.value }))} rows={2} placeholder="Call Isaac 'Captain' at least once…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Mission instructions</label>
-                  <textarea value={newGuest.mission_instructions} onChange={e => setNewGuest(g => ({ ...g, mission_instructions: e.target.value }))} rows={3} placeholder="Convince three people that…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+                  <label style={labelStyle}>🟡 Medium mission</label>
+                  <textarea value={newGuest.mission_medium} onChange={e => setNewGuest(g => ({ ...g, mission_medium: e.target.value }))} rows={2} placeholder="Get two people to join a toast…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
                 </div>
-                <div className="flex gap-3 items-center">
-                  <div className="flex-1">
-                    <label style={labelStyle}>Difficulty</label>
-                    <select value={newGuest.mission_difficulty} onChange={e => setNewGuest(g => ({ ...g, mission_difficulty: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle}>
-                      <option value="easy">Easy</option>
-                      <option value="medium">Medium</option>
-                      <option value="hard">Hard</option>
-                    </select>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer mt-4">
-                    <input type="checkbox" checked={newGuest.proof_required} onChange={e => setNewGuest(g => ({ ...g, proof_required: e.target.checked }))} className="rounded" />
-                    <span className="text-xs" style={{ color: 'rgba(253,246,227,0.5)' }}>Proof required</span>
-                  </label>
+                <div>
+                  <label style={labelStyle}>🔥 Legendary mission</label>
+                  <textarea value={newGuest.mission_legendary} onChange={e => setNewGuest(g => ({ ...g, mission_legendary: e.target.value }))} rows={2} placeholder="Help create a group photo that actually looks fun…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
                 </div>
               </div>
 

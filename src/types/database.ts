@@ -3,6 +3,7 @@ export type PartyStatus = 'draft' | 'live' | 'ended'
 export type ProofType = 'photo' | 'video'
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type AssignedTo = 'all' | 'selected' | 'one'
+export type RsvpStatus = 'pending' | 'accepted' | 'declined'
 
 export interface NoteBlock {
   icon?: string
@@ -48,9 +49,14 @@ export interface Guest {
   mission_title: string | null
   mission_instructions: string | null
   mission_difficulty: Difficulty | null
+  mission_easy: string | null
+  mission_medium: string | null
+  mission_legendary: string | null
   proof_required: boolean
   proof_type: ProofType | null
   mission_status: MissionStatus
+  rsvp_status: RsvpStatus
+  mission_accepted: boolean
   submission_url: string | null
   submission_note: string | null
   memory_appreciation: string | null
