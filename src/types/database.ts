@@ -4,6 +4,17 @@ export type ProofType = 'photo' | 'video'
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type AssignedTo = 'all' | 'selected' | 'one'
 
+export interface NoteBlock {
+  icon?: string
+  text: string
+  link?: string
+}
+
+export interface EventLink {
+  label: string
+  url: string
+}
+
 export interface Party {
   id: string
   host_id: string
@@ -11,6 +22,12 @@ export interface Party {
   birthday_person_photo: string | null
   party_title: string
   party_date: string
+  party_story: string | null
+  event_time: string | null
+  event_location: string | null
+  meeting_point: string | null
+  event_notes: NoteBlock[]
+  event_links: EventLink[]
   theme: string
   adult_count: number
   kid_count: number
@@ -39,6 +56,7 @@ export interface Guest {
   memory_appreciation: string | null
   memory_favorite_moment: string | null
   memory_future_prediction: string | null
+  invite_code: string | null
   is_host: boolean
   created_at: string
 }
@@ -72,16 +90,4 @@ export interface BirthdayNewspaper {
   generated_content: Record<string, unknown> | null
   status: 'draft' | 'published'
   created_at: string
-}
-
-export interface Database {
-  public: {
-    Tables: {
-      parties: { Row: Party; Insert: Omit<Party, 'id' | 'created_at'>; Update: Partial<Party> }
-      guests: { Row: Guest; Insert: Omit<Guest, 'id' | 'created_at'>; Update: Partial<Guest> }
-      children: { Row: Child; Insert: Omit<Child, 'id' | 'created_at'>; Update: Partial<Child> }
-      bonus_missions: { Row: BonusMission; Insert: Omit<BonusMission, 'id' | 'created_at'>; Update: Partial<BonusMission> }
-      birthday_newspapers: { Row: BirthdayNewspaper; Insert: Omit<BirthdayNewspaper, 'id' | 'created_at'>; Update: Partial<BirthdayNewspaper> }
-    }
-  }
 }
