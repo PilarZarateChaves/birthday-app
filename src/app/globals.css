@@ -9,6 +9,8 @@
   --terracotta: #c4622d;
   --lemon: #f5e642;
   --sage: #6b7f5e;
+  --plum: #1c0f20;
+  --card-cream: #fdf8ef;
 }
 
 body {
@@ -16,4 +18,20 @@ body {
   color: var(--navy);
   font-family: 'Plus Jakarta Sans', sans-serif;
   min-height: 100vh;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.8); }
+  50% { opacity: 0.8; transform: scale(1.15); }
+}
+
+@keyframes floatBob {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.6) rotate(-8deg); opacity: 0; }
+  70% { transform: scale(1.1) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }

@@ -52,10 +52,8 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
         }
       }
 
-      // Use a placeholder email derived from name + timestamp
       const email = `${name.toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@gondolieri.local`
 
-      // Find an unassigned slot
       const { data: slots } = await supabase
         .from('guests')
         .select('*')
@@ -91,7 +89,6 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
         guestId = newGuest!.id
       }
 
-      // Save children
       if (hasChildren && children.length > 0) {
         const valid = children.filter(c => c.name.trim() && c.age)
         if (valid.length > 0) {
@@ -119,8 +116,13 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-16" style={{ background: '#0f1a30' }}>
-      <div className="max-w-sm w-full">
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-16 relative overflow-hidden" style={{ background: 'var(--plum)' }}>
+      {/* Warm glow */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(ellipse at 30% 20%, rgba(201,168,76,0.14) 0%, transparent 55%), radial-gradient(ellipse at 70% 80%, rgba(196,98,45,0.08) 0%, transparent 50%)',
+      }} />
+
+      <div className="max-w-sm w-full relative z-10">
         <AnimatePresence mode="wait">
 
           {/* Step 1: Name */}
@@ -141,18 +143,19 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
                 onKeyDown={e => e.key === 'Enter' && name.trim() && setStep('children')}
                 className="w-full px-5 py-4 rounded-2xl text-base outline-none text-center"
                 style={{
-                  background: 'rgba(255,255,255,0.07)',
+                  background: 'rgba(253,246,227,0.06)',
                   color: 'var(--cream)',
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  border: '1.5px solid rgba(201,168,76,0.25)',
                   fontFamily: "'Playfair Display', serif",
                   fontSize: '1.1rem',
+                  transition: 'border-color 0.2s',
                 }}
               />
               <button
                 onClick={() => name.trim() && setStep('children')}
                 disabled={!name.trim()}
-                className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase mt-4 active:scale-95 transition-all disabled:opacity-30"
-                style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                className="w-full py-4 rounded-2xl font-semibold text-sm uppercase mt-4 active:scale-95 transition-all disabled:opacity-30"
+                style={{ background: 'linear-gradient(135deg, #c9a84c, #e8cc6a)', color: 'var(--navy)', letterSpacing: '0.15em', boxShadow: '0 4px 20px rgba(201,168,76,0.3)' }}
               >
                 That's me
               </button>
@@ -171,7 +174,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
 
               <div className="flex flex-col gap-3 mb-6">
                 {[
-                  { value: false, label: 'Just me', sub: 'No crew to report' },
+                  { value: false, label: 'Just me', sub: 'Solo voyage' },
                   { value: true, label: 'Yes, bringing little ones', sub: 'Babies & children welcome' },
                 ].map(opt => (
                   <button
@@ -179,8 +182,9 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
                     onClick={() => setHasChildren(opt.value)}
                     className="w-full px-5 py-4 rounded-2xl text-left transition-all active:scale-95"
                     style={{
-                      background: hasChildren === opt.value ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.04)',
-                      border: hasChildren === opt.value ? '1px solid rgba(201,168,76,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                      background: hasChildren === opt.value ? 'rgba(201,168,76,0.15)' : 'rgba(253,246,227,0.04)',
+                      border: hasChildren === opt.value ? '1.5px solid rgba(201,168,76,0.55)' : '1.5px solid rgba(253,246,227,0.08)',
+                      boxShadow: hasChildren === opt.value ? '0 4px 16px rgba(201,168,76,0.12)' : 'none',
                     }}
                   >
                     <p className="text-sm font-semibold" style={{ color: 'var(--cream)' }}>{opt.label}</p>
@@ -198,7 +202,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
                         value={child.name}
                         onChange={e => setChildren(c => c.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
                         className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none"
-                        style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        style={{ background: 'rgba(253,246,227,0.06)', color: 'var(--cream)', border: '1.5px solid rgba(201,168,76,0.2)' }}
                       />
                       <input
                         placeholder="Age"
@@ -207,14 +211,14 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
                         value={child.age}
                         onChange={e => setChildren(c => c.map((x, j) => j === i ? { ...x, age: e.target.value } : x))}
                         className="w-16 px-3 py-2.5 rounded-xl text-sm outline-none text-center"
-                        style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        style={{ background: 'rgba(253,246,227,0.06)', color: 'var(--cream)', border: '1.5px solid rgba(201,168,76,0.2)' }}
                       />
                     </div>
                   ))}
                   <button
                     onClick={() => setChildren(c => [...c, { name: '', age: '' }])}
                     className="text-xs py-2 px-4 rounded-xl w-full mt-1"
-                    style={{ color: 'var(--gold)', background: 'rgba(201,168,76,0.08)', border: '1px dashed rgba(201,168,76,0.3)' }}
+                    style={{ color: 'var(--gold)', background: 'rgba(201,168,76,0.07)', border: '1px dashed rgba(201,168,76,0.3)' }}
                   >
                     + Add another crew member
                   </button>
@@ -224,8 +228,8 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
               {hasChildren !== null && (
                 <button
                   onClick={() => setStep('photo')}
-                  className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
-                  style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                  className="w-full py-4 rounded-2xl font-semibold text-sm uppercase active:scale-95 transition-all"
+                  style={{ background: 'linear-gradient(135deg, #c9a84c, #e8cc6a)', color: 'var(--navy)', letterSpacing: '0.15em', boxShadow: '0 4px 20px rgba(201,168,76,0.3)' }}
                 >
                   Continue
                 </button>
@@ -242,16 +246,17 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
               <h2 style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.4, marginBottom: '0.75rem', textAlign: 'center' }}>
                 The Society needs a portrait for your membership card.
               </h2>
-              <p className="text-sm text-center mb-8" style={{ color: 'rgba(253,246,227,0.45)' }}>
-                Every member of the Society has one.
+              <p className="text-sm text-center mb-8" style={{ color: 'rgba(253,246,227,0.4)' }}>
+                Every member has one.
               </p>
 
               <label className="block cursor-pointer mb-6">
                 <div
                   className="w-36 h-36 rounded-full mx-auto flex items-center justify-center overflow-hidden transition-all"
                   style={{
-                    background: 'rgba(201,168,76,0.08)',
-                    border: photoPreview ? '2px solid var(--gold)' : '2px dashed rgba(201,168,76,0.35)',
+                    background: 'rgba(201,168,76,0.07)',
+                    border: photoPreview ? '3px solid var(--gold)' : '2px dashed rgba(201,168,76,0.3)',
+                    boxShadow: photoPreview ? '0 6px 24px rgba(201,168,76,0.25)' : 'none',
                   }}
                 >
                   {photoPreview
@@ -269,8 +274,8 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
 
               <button
                 onClick={handleCreate}
-                className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
-                style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                className="w-full py-4 rounded-2xl font-semibold text-sm uppercase active:scale-95 transition-all"
+                style={{ background: 'linear-gradient(135deg, #c9a84c, #e8cc6a)', color: 'var(--navy)', letterSpacing: '0.15em', boxShadow: '0 4px 20px rgba(201,168,76,0.3)' }}
               >
                 Create My Membership Card
               </button>
@@ -278,7 +283,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
               <button
                 onClick={handleCreate}
                 className="w-full py-3 mt-3 text-xs"
-                style={{ color: 'rgba(253,246,227,0.3)' }}
+                style={{ color: 'rgba(253,246,227,0.28)' }}
               >
                 Skip for now
               </button>
@@ -288,10 +293,17 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
           {/* Creating state */}
           {step === 'creating' && (
             <motion.div key="creating" {...fade} className="text-center">
-              <p className="text-xs tracking-[0.4em] uppercase mb-8" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+              <motion.div
+                animate={{ scale: [1, 1.08, 1], opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="text-4xl mb-8"
+              >
+                ⚓
+              </motion.div>
+              <p className="text-xs tracking-[0.4em] uppercase mb-4" style={{ color: 'var(--gold)', opacity: 0.7 }}>
                 The Society is reviewing
               </p>
-              <p style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.25rem', fontStyle: 'italic' }}>
+              <p style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.25rem', fontStyle: 'italic', opacity: 0.8 }}>
                 Preparing your membership card…
               </p>
             </motion.div>
