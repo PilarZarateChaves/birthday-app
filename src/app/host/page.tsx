@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const HOST_EMAIL = 'hola@vcfamilia.com'
+const HOST_EMAIL = 'pilar.zarate.ch@gmail.com'
 const HOST_PASSWORD = 'gondolieri2026'
 
 export default function HostLogin() {
