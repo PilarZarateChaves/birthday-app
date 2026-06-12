@@ -2,21 +2,22 @@
 
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import type { Guest, Child } from '@/types/database'
 
-const DIFFICULTY_COLOR: Record<string, string> = {
-  easy: '#6b7f5e',
-  medium: '#c9a84c',
-  hard: '#c4622d',
-}
+type View = 'card' | 'mission' | 'complete'
+
+const DIFFICULTY_LABEL: Record<string, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
+const DIFFICULTY_COLOR: Record<string, string> = { easy: '#6b7f5e', medium: '#c9a84c', hard: '#c4622d' }
 
 export default function GuestPage({ params }: { params: Promise<{ guestId: string }> }) {
   const { guestId } = use(params)
   const router = useRouter()
   const [guest, setGuest] = useState<Guest | null>(null)
   const [children, setChildren] = useState<Child[]>([])
-  const [missionRevealed, setMissionRevealed] = useState(false)
+  const [view, setView] = useState<View>('card')
+  const [envelopeOpen, setEnvelopeOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,166 +28,341 @@ export default function GuestPage({ params }: { params: Promise<{ guestId: strin
       setGuest(g)
       setChildren(c ?? [])
       setLoading(false)
+      // If they already have a mission status, show mission view
+      if (g?.mission_status !== 'in_progress') setView('complete')
     })
   }, [guestId])
 
   async function markComplete() {
     await supabase.from('guests').update({ mission_status: 'submitted' }).eq('id', guestId)
     setGuest(g => g ? { ...g, mission_status: 'submitted' } : g)
+    setView('complete')
   }
 
   if (loading) return (
-    <main className="min-h-screen flex items-center justify-center" style={{ background: 'var(--navy)' }}>
-      <p style={{ color: 'var(--cream)', opacity: 0.4 }}>Loading…</p>
-    </main>
+    <main className="min-h-screen" style={{ background: '#0f1a30' }} />
   )
 
   if (!guest) return (
-    <main className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--navy)' }}>
-      <p style={{ color: 'var(--cream)', opacity: 0.5 }}>Guest not found.</p>
+    <main className="min-h-screen flex items-center justify-center" style={{ background: '#0f1a30' }}>
+      <p style={{ color: 'var(--cream)', opacity: 0.4 }}>Membership not found.</p>
     </main>
   )
 
   return (
-    <main className="min-h-screen px-4 py-10" style={{ background: 'var(--navy)' }}>
-      <div className="max-w-sm mx-auto">
-        {/* Character Card */}
-        <div className="rounded-3xl overflow-hidden mb-6" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(201,168,76,0.3)' }}>
-          <div className="px-6 pt-6 pb-4">
-            <p className="text-xs tracking-[0.3em] uppercase mb-4 text-center" style={{ color: 'var(--gold)' }}>
-              Royal Gondolieri Society
-            </p>
-            <div className="flex flex-col items-center gap-3">
-              {guest.photo
-                ? <img src={guest.photo} alt="" className="w-20 h-20 rounded-full object-cover" style={{ border: '2px solid var(--gold)' }} />
-                : <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold" style={{ background: 'var(--gold)', color: 'var(--navy)' }}>{guest.name[0]}</div>
-              }
-              <div className="text-center">
-                <p className="font-semibold text-lg" style={{ color: 'var(--cream)' }}>{guest.name}</p>
-                {guest.role_name && (
-                  <p className="text-sm mt-1" style={{ color: 'var(--gold)', fontFamily: "'Playfair Display', serif", fontStyle: 'italic' }}>
-                    {guest.role_name}
-                  </p>
-                )}
-              </div>
-            </div>
-            {guest.role_description && (
-              <p className="text-sm text-center mt-4 leading-relaxed" style={{ color: 'var(--cream)', opacity: 0.7 }}>
-                {guest.role_description}
-              </p>
-            )}
-          </div>
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-16 relative" style={{ background: '#0f1a30' }}>
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: 'radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.06) 0%, transparent 60%)',
+      }} />
 
-          {/* Mission status banner */}
-          {guest.mission_status === 'approved' && (
-            <div className="px-6 py-3 text-center text-sm font-semibold" style={{ background: 'rgba(107,127,94,0.3)', color: '#a8c99a' }}>
-              🏆 Mission Approved
-            </div>
-          )}
-          {guest.mission_status === 'submitted' && (
-            <div className="px-6 py-3 text-center text-sm" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--cream)', opacity: 0.6 }}>
-              🟢 Submitted — awaiting approval
-            </div>
-          )}
-        </div>
+      <div className="max-w-sm w-full relative z-10">
+        <AnimatePresence mode="wait">
 
-        {/* Children cards */}
-        {children.length > 0 && (
-          <div className="mb-6">
-            <p className="text-xs tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--gold)' }}>Your Crew</p>
-            {children.map(child => (
-              <div key={child.id} className="rounded-2xl px-4 py-3 mb-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <p className="text-sm font-semibold" style={{ color: 'var(--cream)' }}>{child.name} <span style={{ opacity: 0.4 }}>({child.age})</span></p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--gold)' }}>{child.role_name}</p>
-                <p className="text-xs mt-1" style={{ color: 'var(--cream)', opacity: 0.6 }}>{child.role_description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Mission section */}
-        {guest.mission_title && (
-          <div className="mb-6">
-            <p className="text-xs tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--gold)' }}>Your Secret Mission</p>
-
-            {!missionRevealed ? (
-              <div
-                className="rounded-3xl p-8 text-center cursor-pointer active:scale-95 transition-all"
-                style={{ background: 'rgba(201,168,76,0.1)', border: '1px dashed var(--gold)' }}
-                onClick={() => setMissionRevealed(true)}
+          {/* Membership Card View */}
+          {view === 'card' && (
+            <motion.div
+              key="card"
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-xs tracking-[0.4em] uppercase text-center mb-8"
+                style={{ color: 'var(--gold)', opacity: 0.7 }}
               >
-                <p className="text-3xl mb-3">🔒</p>
-                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--cream)' }}>Classified</p>
-                <p className="text-xs" style={{ color: 'var(--cream)', opacity: 0.5 }}>Tap to reveal your mission</p>
-              </div>
-            ) : (
-              <div className="rounded-3xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                <div className="px-5 pt-5 pb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="font-semibold" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>
-                      {guest.mission_title}
-                    </p>
-                    {guest.mission_difficulty && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: DIFFICULTY_COLOR[guest.mission_difficulty] + '33', color: DIFFICULTY_COLOR[guest.mission_difficulty] }}>
-                        {guest.mission_difficulty}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--cream)', opacity: 0.8 }}>
-                    {guest.mission_instructions}
+                Welcome aboard
+              </motion.p>
+
+              {/* The membership card */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                className="rounded-3xl overflow-hidden mb-6"
+                style={{
+                  background: 'linear-gradient(145deg, #1e3058 0%, #152238 100%)',
+                  border: '1px solid rgba(201,168,76,0.35)',
+                  boxShadow: '0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(201,168,76,0.2)',
+                }}
+              >
+                {/* Card header */}
+                <div className="px-6 pt-6 pb-2 flex items-center justify-between">
+                  <p className="text-xs tracking-[0.3em] uppercase" style={{ color: 'rgba(201,168,76,0.6)', fontSize: '0.6rem' }}>
+                    Royal Gondolieri Society
                   </p>
-                  {guest.proof_required && (
-                    <p className="text-xs mb-1" style={{ color: 'var(--gold)' }}>
-                      📸 Proof required ({guest.proof_type})
-                    </p>
-                  )}
-                  <p className="text-xs italic" style={{ color: 'var(--cream)', opacity: 0.4 }}>
-                    Do not tell anyone your mission.
-                  </p>
+                  <span style={{ color: 'rgba(201,168,76,0.4)', fontSize: 14 }}>⚓</span>
                 </div>
 
-                {guest.mission_status === 'in_progress' && (
-                  <div className="px-5 pb-5 flex flex-col gap-2">
-                    {guest.proof_required ? (
-                      <button
-                        onClick={() => router.push(`/guest/${guestId}/submit`)}
-                        className="w-full py-3 rounded-2xl font-semibold text-sm active:scale-95 transition-all"
-                        style={{ background: 'var(--gold)', color: 'var(--navy)' }}
-                      >
-                        Submit Proof
-                      </button>
-                    ) : (
-                      <button
-                        onClick={markComplete}
-                        className="w-full py-3 rounded-2xl font-semibold text-sm active:scale-95 transition-all"
-                        style={{ background: 'var(--gold)', color: 'var(--navy)' }}
-                      >
-                        I completed my mission
-                      </button>
+                {/* Photo + role */}
+                <div className="px-6 pt-4 pb-6 text-center">
+                  {guest.photo ? (
+                    <div className="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden" style={{ border: '2px solid rgba(201,168,76,0.5)' }}>
+                      <img src={guest.photo} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold" style={{ background: 'rgba(201,168,76,0.15)', border: '2px solid rgba(201,168,76,0.4)', color: 'var(--gold)' }}>
+                      {guest.name[0]}
+                    </div>
+                  )}
+
+                  <p className="font-semibold text-lg mb-1" style={{ color: 'var(--cream)' }}>{guest.name}</p>
+
+                  {guest.role_name ? (
+                    <>
+                      <p className="text-xs tracking-[0.25em] uppercase mb-3" style={{ color: 'rgba(201,168,76,0.6)', fontSize: '0.65rem' }}>
+                        Society Member
+                      </p>
+                      <div className="inline-block px-4 py-1.5 rounded-full mb-4" style={{ background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.3)' }}>
+                        <p style={{ color: 'var(--gold)', fontFamily: "'Playfair Display', serif", fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                          {guest.role_name}
+                        </p>
+                      </div>
+                      <p className="text-sm leading-relaxed" style={{ color: 'rgba(253,246,227,0.55)', fontStyle: 'italic' }}>
+                        {guest.role_description}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs" style={{ color: 'rgba(253,246,227,0.3)' }}>
+                      The host will assign your role shortly.
+                    </p>
+                  )}
+                </div>
+
+                {/* Card footer */}
+                <div className="px-6 py-3 flex items-center justify-between" style={{ borderTop: '1px solid rgba(201,168,76,0.1)' }}>
+                  <p style={{ color: 'rgba(201,168,76,0.35)', fontSize: '0.6rem', letterSpacing: '0.15em' }}>MEMBERSHIP CARD</p>
+                  <p style={{ color: 'rgba(201,168,76,0.35)', fontSize: '0.6rem', letterSpacing: '0.15em' }}>2026</p>
+                </div>
+              </motion.div>
+
+              {/* Children attached to parent */}
+              {children.length > 0 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mb-6">
+                  {children.map(child => (
+                    <div key={child.id} className="rounded-2xl px-4 py-3 mb-2 flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: 'rgba(201,168,76,0.15)', color: 'var(--gold)' }}>
+                        {child.name[0]}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--cream)' }}>{child.name} <span style={{ opacity: 0.35 }}>({child.age})</span></p>
+                        <p className="text-xs" style={{ color: 'var(--gold)', opacity: 0.7 }}>{child.role_name}</p>
+                      </div>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+
+              {/* Mission CTA */}
+              {guest.mission_title && (
+                <motion.button
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  onClick={() => setView('mission')}
+                  className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
+                  style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                >
+                  Reveal My Mission
+                </motion.button>
+              )}
+            </motion.div>
+          )}
+
+          {/* Mission Reveal */}
+          {view === 'mission' && (
+            <motion.div
+              key="mission"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+            >
+              <AnimatePresence mode="wait">
+                {!envelopeOpen ? (
+                  <motion.div
+                    key="envelope"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="text-center"
+                  >
+                    <p className="text-xs tracking-[0.4em] uppercase mb-6" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                      Classified
+                    </p>
+                    <p style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontStyle: 'italic', lineHeight: 1.8, marginBottom: '2.5rem', opacity: 0.8 }}>
+                      The Society has entrusted you<br />with a secret mission.<br /><br />
+                      Do not tell anyone.<br />
+                      Do not act suspicious.<br />
+                      The Captain must never know.
+                    </p>
+
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setEnvelopeOpen(true)}
+                      className="w-full py-5 rounded-2xl font-semibold text-sm tracking-widest uppercase"
+                      style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                    >
+                      Open Sealed Orders
+                    </motion.button>
+
+                    <button
+                      onClick={() => setView('card')}
+                      className="w-full py-3 mt-2 text-xs"
+                      style={{ color: 'rgba(253,246,227,0.25)' }}
+                    >
+                      ← Back to card
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="mission-content"
+                    initial={{ opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <p className="text-xs tracking-[0.4em] uppercase mb-6 text-center" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                      Your orders
+                    </p>
+
+                    <div className="rounded-3xl overflow-hidden mb-4" style={{
+                      background: 'linear-gradient(145deg, #1e3058 0%, #152238 100%)',
+                      border: '1px solid rgba(201,168,76,0.25)',
+                      boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+                    }}>
+                      <div className="px-6 pt-6 pb-5">
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                          <p style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 600, lineHeight: 1.3 }}>
+                            {guest.mission_title}
+                          </p>
+                          {guest.mission_difficulty && (
+                            <span className="text-xs px-2 py-1 rounded-full flex-shrink-0 mt-0.5 font-medium" style={{
+                              background: DIFFICULTY_COLOR[guest.mission_difficulty] + '22',
+                              color: DIFFICULTY_COLOR[guest.mission_difficulty],
+                              border: `1px solid ${DIFFICULTY_COLOR[guest.mission_difficulty]}44`,
+                            }}>
+                              {DIFFICULTY_LABEL[guest.mission_difficulty]}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-sm leading-relaxed" style={{ color: 'rgba(253,246,227,0.75)', lineHeight: 1.8 }}>
+                          {guest.mission_instructions}
+                        </p>
+
+                        {guest.proof_required && (
+                          <div className="mt-4 flex items-center gap-2">
+                            <span style={{ color: 'var(--gold)', fontSize: 14 }}>📸</span>
+                            <p className="text-xs" style={{ color: 'rgba(201,168,76,0.7)' }}>
+                              Proof required · {guest.proof_type}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="px-6 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                        <p className="text-xs text-center" style={{ color: 'rgba(253,246,227,0.25)', fontStyle: 'italic' }}>
+                          Do not share this with anyone.
+                        </p>
+                      </div>
+                    </div>
+
+                    {guest.mission_status === 'in_progress' && (
+                      guest.proof_required ? (
+                        <button
+                          onClick={() => router.push(`/guest/${guestId}/submit`)}
+                          className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
+                          style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                        >
+                          Submit Proof
+                        </button>
+                      ) : (
+                        <button
+                          onClick={markComplete}
+                          className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
+                          style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                        >
+                          Mission Complete
+                        </button>
+                      )
                     )}
-                  </div>
+
+                    <button
+                      onClick={() => setView('card')}
+                      className="w-full py-3 mt-2 text-xs"
+                      style={{ color: 'rgba(253,246,227,0.25)' }}
+                    >
+                      ← Back to card
+                    </button>
+                  </motion.div>
                 )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+
+          {/* Complete / memory state */}
+          {view === 'complete' && (
+            <motion.div
+              key="complete"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
+              <p className="text-xs tracking-[0.4em] uppercase mb-6" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                {guest.mission_status === 'approved' ? 'Mission Approved' : 'Mission Submitted'}
+              </p>
+
+              {/* Compact card */}
+              <div className="rounded-3xl px-6 py-5 mb-6 flex items-center gap-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,168,76,0.2)' }}>
+                {guest.photo ? (
+                  <img src={guest.photo} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" style={{ border: '1px solid rgba(201,168,76,0.4)' }} />
+                ) : (
+                  <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center font-bold" style={{ background: 'rgba(201,168,76,0.15)', color: 'var(--gold)' }}>{guest.name[0]}</div>
+                )}
+                <div className="text-left">
+                  <p className="font-semibold text-sm" style={{ color: 'var(--cream)' }}>{guest.name}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--gold)', opacity: 0.7 }}>{guest.role_name}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'rgba(253,246,227,0.35)' }}>
+                    {guest.mission_status === 'approved' ? '🏆 Approved' : '🟢 Awaiting approval'}
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Memory capsule CTA */}
-        {(guest.mission_status === 'submitted' || guest.mission_status === 'approved') && !guest.memory_appreciation && (
-          <button
-            onClick={() => router.push(`/guest/${guestId}/memory`)}
-            className="w-full py-4 rounded-2xl font-semibold text-sm tracking-wide active:scale-95 transition-all"
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.15)' }}
-          >
-            Add to Isaac's Birthday Newspaper ✍️
-          </button>
-        )}
+              {!guest.memory_appreciation ? (
+                <>
+                  <p style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1rem', fontStyle: 'italic', opacity: 0.7, marginBottom: '2rem', lineHeight: 1.8 }}>
+                    One final request<br />from The Society.
+                  </p>
+                  <button
+                    onClick={() => router.push(`/guest/${guestId}/memory`)}
+                    className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
+                    style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                  >
+                    Leave a note for the Captain
+                  </button>
+                </>
+              ) : (
+                <div className="rounded-2xl px-5 py-4" style={{ background: 'rgba(107,127,94,0.12)', border: '1px solid rgba(107,127,94,0.25)' }}>
+                  <p className="text-sm" style={{ color: '#a8c99a' }}>Your words are in the newspaper. 🗞️</p>
+                </div>
+              )}
 
-        {guest.memory_appreciation && (
-          <div className="rounded-2xl px-4 py-3 text-center" style={{ background: 'rgba(107,127,94,0.15)', border: '1px solid rgba(107,127,94,0.3)' }}>
-            <p className="text-sm" style={{ color: '#a8c99a' }}>✅ Your words are in the newspaper.</p>
-          </div>
-        )}
+              {/* Reveal mission again if they want */}
+              {guest.mission_title && (
+                <button
+                  onClick={() => { setView('mission'); setEnvelopeOpen(true) }}
+                  className="w-full py-3 mt-3 text-xs"
+                  style={{ color: 'rgba(253,246,227,0.2)' }}
+                >
+                  Review your mission
+                </button>
+              )}
+            </motion.div>
+          )}
+
+        </AnimatePresence>
       </div>
     </main>
   )

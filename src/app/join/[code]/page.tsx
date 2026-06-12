@@ -2,116 +2,106 @@
 
 import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+
+type Step = 'name' | 'children' | 'photo' | 'creating'
+
+const fade = {
+  initial: { opacity: 0, y: 18 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -12 },
+  transition: { duration: 0.5, ease: 'easeOut' as const },
+}
 
 export default function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params)
   const router = useRouter()
-  const [step, setStep] = useState<'info' | 'children'>('info')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [form, setForm] = useState({ name: '', email: '', photo: '' })
-  const [children, setChildren] = useState<{ name: string; age: string }[]>([])
+  const [step, setStep] = useState<Step>('name')
+  const [name, setName] = useState('')
   const [hasChildren, setHasChildren] = useState<boolean | null>(null)
-  const [photoPreview, setPhotoPreview] = useState('')
+  const [children, setChildren] = useState<{ name: string; age: string }[]>([])
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState('')
+  const [error, setError] = useState('')
 
-  function update(field: string, value: string) {
-    setForm(f => ({ ...f, [field]: value }))
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setPhotoFile(f)
+    setPhotoPreview(URL.createObjectURL(f))
   }
 
-  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setPhotoFile(file)
-    setPhotoPreview(URL.createObjectURL(file))
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.name.trim() || !form.email.trim()) return
-    setStep('children')
-  }
-
-  async function handleJoin() {
-    setLoading(true)
+  async function handleCreate() {
+    setStep('creating')
     setError('')
 
     try {
       const { data: party } = await supabase
         .from('parties').select('id').eq('invite_code', code).single()
-      if (!party) throw new Error('Party not found')
+      if (!party) throw new Error('Invitation not found')
 
-      // Check if guest already joined
-      const { data: existing } = await supabase
-        .from('guests').select('id').eq('party_id', party.id).eq('email', form.email.toLowerCase().trim()).single()
+      let photoUrl = ''
+      if (photoFile) {
+        const ext = photoFile.name.split('.').pop()
+        const path = `guests/${party.id}/${Date.now()}.${ext}`
+        const { error: uploadErr } = await supabase.storage.from('party-media').upload(path, photoFile)
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('party-media').getPublicUrl(path)
+          photoUrl = urlData.publicUrl
+        }
+      }
+
+      // Use a placeholder email derived from name + timestamp
+      const email = `${name.toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@gondolieri.local`
+
+      // Find an unassigned slot
+      const { data: slots } = await supabase
+        .from('guests')
+        .select('*')
+        .eq('party_id', party.id)
+        .like('email', '%@gondolieri.local')
+        .eq('name', '')
+        .limit(1)
 
       let guestId: string
 
-      if (existing) {
-        guestId = existing.id
-      } else {
-        // Upload photo if provided
-        let photoUrl = ''
-        if (photoFile) {
-          const ext = photoFile.name.split('.').pop()
-          const path = `guests/${party.id}/${Date.now()}.${ext}`
-          const { error: uploadErr } = await supabase.storage.from('party-media').upload(path, photoFile)
-          if (!uploadErr) {
-            const { data: urlData } = supabase.storage.from('party-media').getPublicUrl(path)
-            photoUrl = urlData.publicUrl
-          }
-        }
-
-        // Find an unassigned slot (empty name placeholder)
-        const { data: slots } = await supabase
+      if (slots && slots.length > 0) {
+        const { data: updated } = await supabase
           .from('guests')
-          .select('*')
-          .eq('party_id', party.id)
-          .like('email', '%@gondolieri.local')
-          .limit(1)
-
-        if (slots && slots.length > 0) {
-          const slot = slots[0]
-          const { data: updated } = await supabase
-            .from('guests')
-            .update({ name: form.name.trim(), email: form.email.toLowerCase().trim(), photo: photoUrl || null })
-            .eq('id', slot.id)
-            .select()
-            .single()
-          guestId = updated!.id
-        } else {
-          // Create new guest with no pre-assigned role
-          const { data: newGuest } = await supabase
-            .from('guests')
-            .insert({
-              party_id: party.id,
-              name: form.name.trim(),
-              email: form.email.toLowerCase().trim(),
-              photo: photoUrl || null,
-              mission_status: 'in_progress',
-              proof_required: false,
-              is_host: false,
-            })
-            .select()
-            .single()
-          guestId = newGuest!.id
-        }
+          .update({ name: name.trim(), email, photo: photoUrl || null })
+          .eq('id', slots[0].id)
+          .select()
+          .single()
+        guestId = updated!.id
+      } else {
+        const { data: newGuest } = await supabase
+          .from('guests')
+          .insert({
+            party_id: party.id,
+            name: name.trim(),
+            email,
+            photo: photoUrl || null,
+            mission_status: 'in_progress',
+            proof_required: false,
+            is_host: false,
+          })
+          .select()
+          .single()
+        guestId = newGuest!.id
       }
 
       // Save children
       if (hasChildren && children.length > 0) {
-        const validChildren = children.filter(c => c.name.trim() && c.age)
-        if (validChildren.length > 0) {
+        const valid = children.filter(c => c.name.trim() && c.age)
+        if (valid.length > 0) {
           await supabase.from('children').insert(
-            validChildren.map(c => ({
+            valid.map(c => ({
               guest_id: guestId,
               party_id: party.id,
               name: c.name.trim(),
               age: Number(c.age),
-              role_name: Number(c.age) <= 4
-                ? 'Honorary Tiny Ambassador'
-                : 'Junior Gondoliero',
+              role_name: Number(c.age) <= 4 ? 'Tiny Ambassador' : 'Junior Gondoliero',
               role_description: Number(c.age) <= 4
                 ? 'Bringing joy and earning honorary lemons.'
                 : 'On a secret junior mission.',
@@ -124,138 +114,190 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
       router.push(`/guest/${guestId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
-      setLoading(false)
+      setStep('photo')
     }
   }
 
-  if (step === 'info') {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: 'var(--navy)' }}>
-        <div className="max-w-sm w-full">
-          <p className="text-xs tracking-[0.3em] uppercase mb-2 text-center" style={{ color: 'var(--gold)' }}>Join the Voyage</p>
-          <h1 className="text-3xl font-bold text-center mb-8" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>
-            Who are you,<br />sailor?
-          </h1>
+  return (
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-16" style={{ background: '#0f1a30' }}>
+      <div className="max-w-sm w-full">
+        <AnimatePresence mode="wait">
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Photo upload */}
-            <div className="flex flex-col items-center gap-3 mb-2">
-              <label className="cursor-pointer">
+          {/* Step 1: Name */}
+          {step === 'name' && (
+            <motion.div key="name" {...fade}>
+              <p className="text-xs tracking-[0.4em] uppercase mb-8 text-center" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                The Society asks
+              </p>
+              <h2 style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.3, marginBottom: '2rem', textAlign: 'center' }}>
+                Before we can assign your role…<br />
+                <span style={{ fontStyle: 'italic', opacity: 0.7 }}>what should we call you?</span>
+              </h2>
+              <input
+                autoFocus
+                placeholder="Your name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && name.trim() && setStep('children')}
+                className="w-full px-5 py-4 rounded-2xl text-base outline-none text-center"
+                style={{
+                  background: 'rgba(255,255,255,0.07)',
+                  color: 'var(--cream)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: '1.1rem',
+                }}
+              />
+              <button
+                onClick={() => name.trim() && setStep('children')}
+                disabled={!name.trim()}
+                className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase mt-4 active:scale-95 transition-all disabled:opacity-30"
+                style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+              >
+                That's me
+              </button>
+            </motion.div>
+          )}
+
+          {/* Step 2: Children */}
+          {step === 'children' && (
+            <motion.div key="children" {...fade}>
+              <p className="text-xs tracking-[0.4em] uppercase mb-8 text-center" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                Welcome, {name}
+              </p>
+              <h2 style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.4, marginBottom: '2rem', textAlign: 'center' }}>
+                Are any little crew members joining your voyage?
+              </h2>
+
+              <div className="flex flex-col gap-3 mb-6">
+                {[
+                  { value: false, label: 'Just me', sub: 'No crew to report' },
+                  { value: true, label: 'Yes, bringing little ones', sub: 'Babies & children welcome' },
+                ].map(opt => (
+                  <button
+                    key={String(opt.value)}
+                    onClick={() => setHasChildren(opt.value)}
+                    className="w-full px-5 py-4 rounded-2xl text-left transition-all active:scale-95"
+                    style={{
+                      background: hasChildren === opt.value ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: hasChildren === opt.value ? '1px solid rgba(201,168,76,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <p className="text-sm font-semibold" style={{ color: 'var(--cream)' }}>{opt.label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--cream)', opacity: 0.4 }}>{opt.sub}</p>
+                  </button>
+                ))}
+              </div>
+
+              {hasChildren && (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+                  {children.map((child, i) => (
+                    <div key={i} className="flex gap-2 mb-2">
+                      <input
+                        placeholder="Name"
+                        value={child.name}
+                        onChange={e => setChildren(c => c.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                        className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none"
+                        style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                      <input
+                        placeholder="Age"
+                        type="number"
+                        min={0} max={17}
+                        value={child.age}
+                        onChange={e => setChildren(c => c.map((x, j) => j === i ? { ...x, age: e.target.value } : x))}
+                        className="w-16 px-3 py-2.5 rounded-xl text-sm outline-none text-center"
+                        style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setChildren(c => [...c, { name: '', age: '' }])}
+                    className="text-xs py-2 px-4 rounded-xl w-full mt-1"
+                    style={{ color: 'var(--gold)', background: 'rgba(201,168,76,0.08)', border: '1px dashed rgba(201,168,76,0.3)' }}
+                  >
+                    + Add another crew member
+                  </button>
+                </motion.div>
+              )}
+
+              {hasChildren !== null && (
+                <button
+                  onClick={() => setStep('photo')}
+                  className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
+                  style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+                >
+                  Continue
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* Step 3: Photo */}
+          {step === 'photo' && (
+            <motion.div key="photo" {...fade}>
+              <p className="text-xs tracking-[0.4em] uppercase mb-8 text-center" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                Almost aboard
+              </p>
+              <h2 style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.4, marginBottom: '0.75rem', textAlign: 'center' }}>
+                The Society needs a portrait for your membership card.
+              </h2>
+              <p className="text-sm text-center mb-8" style={{ color: 'rgba(253,246,227,0.45)' }}>
+                Every member of the Society has one.
+              </p>
+
+              <label className="block cursor-pointer mb-6">
                 <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center overflow-hidden"
-                  style={{ background: 'rgba(255,255,255,0.08)', border: '2px dashed rgba(201,168,76,0.4)' }}
+                  className="w-36 h-36 rounded-full mx-auto flex items-center justify-center overflow-hidden transition-all"
+                  style={{
+                    background: 'rgba(201,168,76,0.08)',
+                    border: photoPreview ? '2px solid var(--gold)' : '2px dashed rgba(201,168,76,0.35)',
+                  }}
                 >
                   {photoPreview
                     ? <img src={photoPreview} alt="" className="w-full h-full object-cover" />
-                    : <span className="text-2xl">📸</span>
+                    : <div className="text-center">
+                        <p className="text-3xl mb-1">📷</p>
+                        <p className="text-xs" style={{ color: 'rgba(253,246,227,0.35)' }}>Tap to add</p>
+                      </div>
                   }
                 </div>
                 <input type="file" accept="image/*" capture="user" className="hidden" onChange={handlePhotoChange} />
               </label>
-              <p className="text-xs" style={{ color: 'var(--cream)', opacity: 0.4 }}>Tap to add your photo</p>
-            </div>
 
-            <input
-              placeholder="Your name"
-              value={form.name}
-              onChange={e => update('name', e.target.value)}
-              required
-              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
-              style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.15)' }}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={form.email}
-              onChange={e => update('email', e.target.value)}
-              required
-              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
-              style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.15)' }}
-            />
+              {error && <p className="text-sm text-center mb-4" style={{ color: 'var(--terracotta)' }}>{error}</p>}
 
-            <button
-              type="submit"
-              className="w-full py-4 rounded-2xl font-semibold text-sm tracking-wide mt-2 active:scale-95 transition-all"
-              style={{ background: 'var(--gold)', color: 'var(--navy)' }}
-            >
-              Continue
-            </button>
-          </form>
-        </div>
-      </main>
-    )
-  }
+              <button
+                onClick={handleCreate}
+                className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all"
+                style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+              >
+                Create My Membership Card
+              </button>
 
-  return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: 'var(--navy)' }}>
-      <div className="max-w-sm w-full">
-        <p className="text-xs tracking-[0.3em] uppercase mb-2 text-center" style={{ color: 'var(--gold)' }}>Almost there</p>
-        <h1 className="text-2xl font-bold text-center mb-6" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>
-          Are you bringing any little crew members?
-        </h1>
+              <button
+                onClick={handleCreate}
+                className="w-full py-3 mt-3 text-xs"
+                style={{ color: 'rgba(253,246,227,0.3)' }}
+              >
+                Skip for now
+              </button>
+            </motion.div>
+          )}
 
-        <div className="flex flex-col gap-3 mb-6">
-          {[{ value: false, label: 'Just me' }, { value: true, label: 'Yes, bringing children' }].map(opt => (
-            <button
-              key={String(opt.value)}
-              onClick={() => setHasChildren(opt.value)}
-              className="w-full py-3 rounded-xl text-sm font-medium transition-all"
-              style={{
-                background: hasChildren === opt.value ? 'var(--gold)' : 'rgba(255,255,255,0.06)',
-                color: hasChildren === opt.value ? 'var(--navy)' : 'var(--cream)',
-                border: hasChildren === opt.value ? 'none' : '1px solid rgba(255,255,255,0.1)',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+          {/* Creating state */}
+          {step === 'creating' && (
+            <motion.div key="creating" {...fade} className="text-center">
+              <p className="text-xs tracking-[0.4em] uppercase mb-8" style={{ color: 'var(--gold)', opacity: 0.7 }}>
+                The Society is reviewing
+              </p>
+              <p style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif", fontSize: '1.25rem', fontStyle: 'italic' }}>
+                Preparing your membership card…
+              </p>
+            </motion.div>
+          )}
 
-        {hasChildren && (
-          <div className="flex flex-col gap-3 mb-4">
-            {children.map((child, i) => (
-              <div key={i} className="flex gap-2">
-                <input
-                  placeholder="Name"
-                  value={child.name}
-                  onChange={e => setChildren(c => c.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
-                  className="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
-                  style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.15)' }}
-                />
-                <input
-                  placeholder="Age"
-                  type="number"
-                  min={0}
-                  max={17}
-                  value={child.age}
-                  onChange={e => setChildren(c => c.map((x, j) => j === i ? { ...x, age: e.target.value } : x))}
-                  className="w-16 px-3 py-2 rounded-xl text-sm outline-none"
-                  style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.15)' }}
-                />
-              </div>
-            ))}
-            <button
-              onClick={() => setChildren(c => [...c, { name: '', age: '' }])}
-              className="text-xs py-2 rounded-xl"
-              style={{ color: 'var(--gold)', background: 'rgba(201,168,76,0.1)' }}
-            >
-              + Add another child
-            </button>
-          </div>
-        )}
-
-        {error && <p className="text-sm text-center mb-3" style={{ color: 'var(--terracotta)' }}>{error}</p>}
-
-        {hasChildren !== null && (
-          <button
-            onClick={handleJoin}
-            disabled={loading}
-            className="w-full py-4 rounded-2xl font-semibold text-sm tracking-wide active:scale-95 transition-all disabled:opacity-60"
-            style={{ background: 'var(--gold)', color: 'var(--navy)' }}
-          >
-            {loading ? 'Boarding the Duffy…' : 'Board the Duffy'}
-          </button>
-        )}
+        </AnimatePresence>
       </div>
     </main>
   )
