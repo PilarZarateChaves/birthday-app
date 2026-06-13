@@ -5,16 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import type { Party, Guest } from '@/types/database'
 
-type Stage = 'invite' | 'revealed' | 'accepted' | 'declined'
+type Step = 'invitation' | 'role' | 'missions' | 'allset' | 'captainslog' | 'declined'
 type CrewMate = { name: string; photo: string | null }
 
 // ─────────────────────────────────────────────────────────
-// Confetti — bright festive burst on RSVP
+// Confetti
 // ─────────────────────────────────────────────────────────
-const CONFETTI_COLORS = [
-  '#ffd23f', '#ff7a59', '#5fb6e6', '#5fae7e',
-  '#f7a8c4', '#ffe57a', '#ffffff', '#ff9f6e',
-]
+const CONFETTI_COLORS = ['#ffd23f', '#ff7a59', '#5fb6e6', '#5fae7e', '#f7a8c4', '#ffe57a', '#ffffff', '#ff9f6e']
 
 function Confetti() {
   const particles = useMemo(() =>
@@ -34,7 +31,6 @@ function Confetti() {
       }
     })
   , [])
-
   return (
     <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center overflow-hidden">
       <div style={{ position: 'relative' }}>
@@ -44,14 +40,7 @@ function Confetti() {
             initial={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 1 }}
             animate={{ x: p.x, y: p.y, opacity: 0, rotate: p.rotate, scale: 0.5 }}
             transition={{ duration: 1.5 + p.delay * 2, delay: p.delay, ease: [0.1, 0.6, 0.4, 1] }}
-            style={{
-              position: 'absolute',
-              width: p.w,
-              height: p.h,
-              borderRadius: p.round ? '50%' : 2,
-              background: p.color,
-              transformOrigin: 'center center',
-            }}
+            style={{ position: 'absolute', width: p.w, height: p.h, borderRadius: p.round ? '50%' : 2, background: p.color }}
           />
         ))}
       </div>
@@ -60,74 +49,40 @@ function Confetti() {
 }
 
 // ─────────────────────────────────────────────────────────
-// Crew aboard — avatar cluster of friends who said yes
+// Step progress dots (1-2-3 wizard)
 // ─────────────────────────────────────────────────────────
-function CrewAboard({ crew }: { crew: CrewMate[] }) {
-  if (crew.length === 0) return null
-  const shown = crew.slice(0, 7)
-  const extra = crew.length - shown.length
-
+const WIZARD_STEPS: Step[] = ['invitation', 'role', 'missions']
+function StepDots({ current }: { current: Step }) {
+  const idx = WIZARD_STEPS.indexOf(current)
+  if (idx < 0) return null
+  const labels = ['Invitation', 'Your role', 'Missions']
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.5 }}
-      className="flex flex-col items-center gap-2 mb-7"
-    >
-      <div className="flex items-center">
-        {shown.map((m, i) => (
+    <div className="flex flex-col items-center gap-2 pt-7 pb-1">
+      <div className="flex items-center gap-2">
+        {WIZARD_STEPS.map((_, i) => (
           <div
             key={i}
-            className="rounded-full flex items-center justify-center overflow-hidden"
             style={{
-              width: 34, height: 34,
-              marginLeft: i === 0 ? 0 : -10,
-              border: '2.5px solid #fff9ee',
-              background: 'linear-gradient(135deg, var(--sunny-soft), var(--coral-soft))',
-              color: 'var(--coral)',
-              fontSize: 12, fontWeight: 700,
-              boxShadow: '0 2px 8px rgba(45,58,74,0.12)',
-              zIndex: shown.length - i,
+              height: 6, borderRadius: 99,
+              width: i === idx ? 26 : 6,
+              background: i <= idx ? 'var(--coral)' : 'rgba(45,58,74,0.16)',
+              transition: 'all 0.4s ease',
             }}
-          >
-            {m.photo
-              ? <img src={m.photo} alt="" className="w-full h-full object-cover" />
-              : (m.name?.[0] ?? '🍋')}
-          </div>
+          />
         ))}
-        {extra > 0 && (
-          <div
-            className="rounded-full flex items-center justify-center"
-            style={{
-              width: 34, height: 34, marginLeft: -10,
-              border: '2.5px solid #fff9ee', background: 'var(--sky-soft)',
-              color: 'var(--sky)', fontSize: 11, fontWeight: 700,
-            }}
-          >
-            +{extra}
-          </div>
-        )}
       </div>
-      <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>
-        <span style={{ fontWeight: 700, color: 'var(--coral)' }}>{crew.length}</span>
-        {crew.length === 1 ? ' friend is' : ' friends'} already aboard 🍋
+      <p className="text-xs font-medium" style={{ color: 'var(--riviera-ink-soft)', opacity: 0.7 }}>
+        Step {idx + 1} of 3 · {labels[idx]}
       </p>
-    </motion.div>
+    </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────
 // Mission card
 // ─────────────────────────────────────────────────────────
-function MissionCard({
-  level, badge, accent, tint, text, delay,
-}: {
-  level: string
-  badge: string
-  accent: string
-  tint: string
-  text: string
-  delay: number
+function MissionCard({ level, badge, accent, tint, text, delay }: {
+  level: string; badge: string; accent: string; tint: string; text: string; delay: number
 }) {
   return (
     <motion.div
@@ -135,46 +90,48 @@ function MissionCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
       className="rounded-2xl overflow-hidden"
-      style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}
+      style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.08)' }}
     >
       <div style={{ height: 4, background: accent }} />
       <div className="px-4 py-4" style={{ background: tint }}>
         <div className="flex items-center gap-1.5 mb-2">
           <span style={{ fontSize: 13 }}>{badge}</span>
-          <span className="text-xs font-bold tracking-[0.14em] uppercase" style={{ color: accent }}>
-            {level}
-          </span>
+          <span className="text-xs font-bold tracking-[0.14em] uppercase" style={{ color: accent }}>{level}</span>
         </div>
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>
-          {text}
-        </p>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>{text}</p>
       </div>
     </motion.div>
   )
 }
 
 // ─────────────────────────────────────────────────────────
-// Main page
+// Page
 // ─────────────────────────────────────────────────────────
 export default function GuestInvite({ params }: { params: Promise<{ guestCode: string }> }) {
   const { guestCode } = use(params)
   const [guest, setGuest] = useState<Guest | null>(null)
   const [party, setParty] = useState<Party | null>(null)
   const [crew, setCrew] = useState<CrewMate[]>([])
-  const [stage, setStage] = useState<Stage>('invite')
+  const [step, setStep] = useState<Step>('invitation')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
-  const prevStage = useRef<Stage>('invite')
+
+  // Captain's Log local state
+  const [note, setNote] = useState('')
+  const [noteSaved, setNoteSaved] = useState(false)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   async function loadCrew(partyId: string) {
-    const { data } = await supabase
-      .from('guests')
-      .select('name, photo')
-      .eq('party_id', partyId)
-      .eq('rsvp_status', 'accepted')
+    const { data } = await supabase.from('guests').select('name, photo').eq('party_id', partyId).eq('rsvp_status', 'accepted')
     if (data) setCrew(data as CrewMate[])
+  }
+
+  function fire() {
+    setShowConfetti(true)
+    setTimeout(() => setShowConfetti(false), 2800)
   }
 
   useEffect(() => {
@@ -189,43 +146,38 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
         const p = (data as unknown as { parties: Party }).parties
         setGuest(g)
         setParty(p)
-        const initial: Stage =
+        setNote(g.memory_favorite_moment ?? '')
+        setPhotos(Array.isArray(g.memory_photos) ? g.memory_photos : [])
+        const ended = p?.status === 'ended'
+        const start: Step =
           g.rsvp_status === 'declined' ? 'declined'
-          : g.mission_accepted ? 'accepted'
-          : g.rsvp_status === 'accepted' ? 'revealed'
-          : 'invite'
-        prevStage.current = initial
-        setStage(initial)
+          : ended && g.mission_status === 'approved' ? 'captainslog'
+          : g.mission_accepted ? 'allset'
+          : g.rsvp_status === 'accepted' ? 'role'
+          : 'invitation'
+        setStep(start)
         if (p?.id) loadCrew(p.id)
         setLoading(false)
       })
   }, [guestCode])
 
-  useEffect(() => {
-    if (stage === 'revealed' && prevStage.current === 'invite') {
-      setShowConfetti(true)
-      const t = setTimeout(() => setShowConfetti(false), 2800)
-      return () => clearTimeout(t)
-    }
-    prevStage.current = stage
-  }, [stage])
-
-  async function rsvpAccept() {
+  async function acceptInvitation() {
     if (!guest || saving) return
     setSaving(true)
     await supabase.from('guests').update({ rsvp_status: 'accepted' }).eq('id', guest.id)
     setGuest(g => g ? { ...g, rsvp_status: 'accepted' } : g)
-    setStage('revealed')
+    fire()
+    setStep('role')
     setSaving(false)
     if (party?.id) loadCrew(party.id)
   }
 
-  async function rsvpDecline() {
+  async function declineInvitation() {
     if (!guest || saving) return
     setSaving(true)
     await supabase.from('guests').update({ rsvp_status: 'declined' }).eq('id', guest.id)
     setGuest(g => g ? { ...g, rsvp_status: 'declined' } : g)
-    setStage('declined')
+    setStep('declined')
     setSaving(false)
   }
 
@@ -234,8 +186,33 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     setSaving(true)
     await supabase.from('guests').update({ mission_accepted: true, mission_status: 'submitted' }).eq('id', guest.id)
     setGuest(g => g ? { ...g, mission_accepted: true } : g)
-    setStage('accepted')
+    fire()
+    setStep('allset')
     setSaving(false)
+  }
+
+  async function saveNote() {
+    if (!guest || saving) return
+    setSaving(true)
+    await supabase.from('guests').update({ memory_favorite_moment: note }).eq('id', guest.id)
+    setNoteSaved(true)
+    setSaving(false)
+    setTimeout(() => setNoteSaved(false), 2500)
+  }
+
+  async function uploadPhoto(file: File) {
+    if (!guest || !party || uploadingPhoto) return
+    setUploadingPhoto(true)
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+    const path = `memories/${party.id}/${guest.id}/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('party-media').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('party-media').getPublicUrl(path)
+      const next = [...photos, data.publicUrl]
+      setPhotos(next)
+      await supabase.from('guests').update({ memory_photos: next }).eq('id', guest.id)
+    }
+    setUploadingPhoto(false)
   }
 
   if (loading) return <main className="min-h-screen" style={{ background: 'var(--riviera-bg)' }} />
@@ -251,29 +228,38 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
   const partyDateObj = new Date(party.party_date + 'T12:00:00')
   const partyDate = partyDateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
   const sleeps = Math.round((partyDateObj.getTime() - today.getTime()) / 86400000)
   const countdownText =
     sleeps > 1 ? `${sleeps} sleeps until we set sail`
     : sleeps === 1 ? 'One sleep until we set sail'
-    : sleeps === 0 ? "Today's the day. We set sail! 🎉"
-    : 'The voyage has sailed 🌊'
+    : sleeps === 0 ? "Today's the day. We set sail!"
+    : 'The voyage has sailed'
 
   const notes = Array.isArray(party.event_notes) ? party.event_notes : []
   const links = Array.isArray(party.event_links) ? party.event_links : []
-  const hasMissions = !!(guest.mission_easy || guest.mission_medium || guest.mission_legendary)
   const firstName = guest.name.split(' ')[0]
-
-  // Host-paced reveals (the "drip"). Default to live if the column predates this build.
+  const bdayName = party.birthday_person_name
   const titlesLive = party.reveal_titles ?? true
   const missionsLive = party.reveal_missions ?? true
+  const missionList = [
+    guest.mission_easy && { level: 'Easy', badge: '🟢', accent: 'var(--leaf)', tint: 'var(--leaf-soft)', text: guest.mission_easy },
+    guest.mission_medium && { level: 'Medium', badge: '🟡', accent: '#e0a93c', tint: 'var(--sunny-soft)', text: guest.mission_medium },
+    guest.mission_legendary && { level: 'Legendary', badge: '🔥', accent: 'var(--coral)', tint: 'var(--coral-soft)', text: guest.mission_legendary },
+  ].filter(Boolean) as { level: string; badge: string; accent: string; tint: string; text: string }[]
+
+  const stepIn = { opacity: 0, x: 36 }
+  const stepAnim = { opacity: 1, x: 0 }
+  const stepOut = { opacity: 0, x: -36 }
+  const stepT = { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const }
+
+  const sectionLabel = (text: string, color = 'var(--sky)') => (
+    <p style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color, marginBottom: '0.8rem' }}>{text}</p>
+  )
 
   return (
-    <main className="min-h-screen pb-20 relative overflow-hidden" style={{ background: 'var(--riviera-bg)' }}>
-
-      {/* Soft Mediterranean gradient blobs */}
+    <main className="min-h-screen relative overflow-hidden" style={{ background: 'var(--riviera-bg)' }}>
+      {/* Gradient blobs */}
       <div className="fixed pointer-events-none" style={{ top: '-12%', left: '-18%', width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,210,63,0.5) 0%, transparent 70%)', filter: 'blur(20px)' }} />
       <div className="fixed pointer-events-none" style={{ top: '4%', right: '-22%', width: 380, height: 380, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,122,89,0.35) 0%, transparent 70%)', filter: 'blur(24px)' }} />
       <div className="fixed pointer-events-none" style={{ bottom: '-14%', left: '-10%', width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(95,182,230,0.32) 0%, transparent 70%)', filter: 'blur(26px)' }} />
@@ -281,407 +267,345 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
       {showConfetti && <Confetti />}
 
-      <div className="max-w-sm mx-auto px-5 pt-9 relative z-10">
+      <div className="max-w-sm mx-auto px-5 relative z-10 min-h-screen flex flex-col">
 
-        {/* ── COUNTDOWN PILL ── */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex justify-center mb-7"
-        >
-          <span
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold"
-            style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 16px rgba(255,122,89,0.18)' }}
-          >
-            ⛵ {countdownText}
-          </span>
-        </motion.div>
+        <StepDots current={step} />
 
-        {/* ── AVATAR + HEADLINE ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1 }}
-          className="text-center mb-6"
-        >
-          <p className="tracking-[0.28em] uppercase mb-5" style={{ fontSize: '0.62rem', color: 'var(--riviera-ink-soft)', opacity: 0.7 }}>
-            {party.birthday_person_name}'s Birthday · Boat Day
-          </p>
-
-          {guest.photo ? (
-            <div className="w-24 h-24 rounded-full mx-auto mb-5 overflow-hidden" style={{
-              border: '4px solid #fff',
-              boxShadow: '0 10px 30px rgba(45,58,74,0.16)',
-            }}>
-              <img src={guest.photo} alt="" className="w-full h-full object-cover" />
-            </div>
-          ) : (
-            <div className="w-24 h-24 rounded-full mx-auto mb-5 flex items-center justify-center" style={{
-              background: 'linear-gradient(135deg, var(--sunny) 0%, var(--coral) 100%)',
-              border: '4px solid #fff',
-              boxShadow: '0 10px 30px rgba(255,122,89,0.28)',
-              color: '#fff',
-              fontFamily: "'Playfair Display', serif",
-              fontSize: '2.2rem',
-              fontWeight: 700,
-            }}>
-              {guest.name[0]}
-            </div>
-          )}
-
-          <h1 style={{
-            fontFamily: "'Playfair Display', serif",
-            fontSize: '2rem',
-            fontWeight: 700,
-            color: 'var(--riviera-ink)',
-            lineHeight: 1.15,
-          }}>
-            You're on the crew,
-          </h1>
-          <h1 style={{
-            fontFamily: "'Playfair Display', serif",
-            fontSize: '2rem',
-            fontWeight: 700,
-            color: 'var(--coral)',
-            lineHeight: 1.15,
-          }}>
-            {firstName}.
-          </h1>
-        </motion.div>
-
-        {/* ── CREW ABOARD ── */}
-        <CrewAboard crew={crew} />
-
-        {/* ── PARTY STORY ── */}
-        {party.party_story && (
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="text-[0.95rem] text-center leading-[1.85] mb-6"
-            style={{ color: 'var(--riviera-ink-soft)' }}
-          >
-            {party.party_story}
-          </motion.p>
-        )}
-
-        {/* ── ROLE CARD ── */}
-        {guest.role_name && titlesLive && (
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="rounded-3xl px-5 py-5 mb-4 text-center relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, var(--sunny-soft) 0%, var(--coral-soft) 100%)',
-              boxShadow: '0 8px 26px rgba(255,180,120,0.22)',
-            }}
-          >
-            <p style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--coral)', opacity: 0.8, marginBottom: '0.4rem' }}>
-              Your boat-day title
-            </p>
-            <p style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: '1.35rem',
-              fontWeight: 700,
-              color: 'var(--riviera-ink)',
-              lineHeight: 1.25,
-              marginBottom: guest.role_description ? '0.5rem' : 0,
-            }}>
-              {guest.role_name}
-            </p>
-            {guest.role_description && (
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
-                {guest.role_description}
-              </p>
-            )}
-          </motion.div>
-        )}
-
-        {/* ── ROLE CARD — sealed teaser (title not released yet) ── */}
-        {guest.role_name && !titlesLive && (
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="rounded-3xl px-5 py-5 mb-4 text-center"
-            style={{ background: '#fff', boxShadow: '0 8px 26px rgba(45,58,74,0.07)', border: '1.5px dashed var(--coral-soft)' }}
-          >
-            <p style={{ fontSize: '1.6rem', marginBottom: '0.3rem' }}>🎁</p>
-            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
-              Your title is still with the Captain
-            </p>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
-              Boat-day titles are revealed closer to departure. Keep an eye out 👀
-            </p>
-          </motion.div>
-        )}
-
-        {/* ── DEPARTURE DETAILS ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.35 }}
-          className="rounded-3xl px-5 py-4 mb-4"
-          style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}
-        >
-          <p style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--sky)', marginBottom: '0.85rem' }}>
-            Departure details
-          </p>
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-start gap-3">
-              <span style={{ fontSize: 15, marginTop: 1, flexShrink: 0 }}>📅</span>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: 'var(--riviera-ink)' }}>{partyDate}</p>
-                {party.event_time && <p className="text-xs mt-0.5" style={{ color: 'var(--riviera-ink-soft)' }}>{party.event_time}</p>}
-              </div>
-            </div>
-            {party.event_location && (
-              <div className="flex items-start gap-3">
-                <span style={{ fontSize: 15, marginTop: 1, flexShrink: 0 }}>📍</span>
-                <p className="text-sm" style={{ color: 'var(--riviera-ink)' }}>{party.event_location}</p>
-              </div>
-            )}
-            {party.meeting_point && (
-              <div className="flex items-start gap-3">
-                <span style={{ fontSize: 15, marginTop: 1, flexShrink: 0 }}>🚢</span>
-                <p className="text-sm" style={{ color: 'var(--riviera-ink)' }}>{party.meeting_point}</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* ── BEFORE BOARDING NOTES ── */}
-        {notes.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="rounded-3xl px-5 py-4 mb-4"
-            style={{ background: 'var(--leaf-soft)', boxShadow: '0 6px 22px rgba(95,174,126,0.12)' }}
-          >
-            <p style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--leaf)', marginBottom: '0.85rem' }}>
-              Before boarding
-            </p>
-            <div className="flex flex-col gap-2.5">
-              {notes.map((note, i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  {note.icon && <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>{note.icon}</span>}
-                  <div>
-                    <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>{note.text}</p>
-                    {note.link && (
-                      <a href={note.link} target="_blank" rel="noopener noreferrer"
-                        className="text-xs underline mt-0.5 block" style={{ color: 'var(--leaf)' }}>
-                        Open →
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── EVENT LINKS ── */}
-        {links.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.43 }}
-            className="flex flex-col gap-2 mb-4"
-          >
-            {links.map((link, i) => (
-              <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-between px-5 py-3.5 rounded-2xl active:scale-95 transition-all"
-                style={{ background: '#fff', boxShadow: '0 4px 16px rgba(45,58,74,0.06)', color: 'var(--sky)', textDecoration: 'none' }}>
-                <span className="text-sm font-semibold">{link.label}</span>
-                <span style={{ opacity: 0.5, fontSize: 12 }}>↗</span>
-              </a>
-            ))}
-          </motion.div>
-        )}
-
-        {/* ── DIVIDER ── */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.7, delay: 0.46 }}
-          className="flex items-center gap-3 my-7"
-          style={{ color: 'rgba(45,58,74,0.12)' }}
-        >
-          <div className="flex-1 h-px" style={{ background: 'currentColor' }} />
-          <span style={{ fontSize: 14 }}>🥂</span>
-          <div className="flex-1 h-px" style={{ background: 'currentColor' }} />
-        </motion.div>
-
-        {/* ── CTA / MISSIONS ── */}
         <AnimatePresence mode="wait">
 
-          {/* INVITE */}
-          {stage === 'invite' && (
-            <motion.div
-              key="invite"
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -14, transition: { duration: 0.3 } }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {hasMissions && (
-                <p className="text-sm text-center mb-5 leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
-                  Say you're coming and we'll reveal<br />your 3 secret boat-day missions 🤫
-                </p>
+          {/* ════════ SCREEN 1 — INVITATION ════════ */}
+          {step === 'invitation' && (
+            <motion.div key="invitation" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
+              className="flex-1 flex flex-col justify-center py-6 text-center">
+
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+                className="tracking-[0.28em] uppercase mb-5" style={{ fontSize: '0.62rem', color: 'var(--coral)' }}>
+                You're invited
+              </motion.p>
+
+              {/* Birthday person photo — the emotional anchor */}
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}
+                className="mx-auto mb-6">
+                {party.birthday_person_photo ? (
+                  <div className="rounded-[2rem] overflow-hidden mx-auto" style={{ width: 200, height: 230, border: '5px solid #fff', boxShadow: '0 16px 44px rgba(45,58,74,0.22)' }}>
+                    <img src={party.birthday_person_photo} alt={bdayName} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="rounded-[2rem] mx-auto flex items-center justify-center" style={{ width: 200, height: 230, background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '5px solid #fff', boxShadow: '0 16px 44px rgba(255,122,89,0.3)', color: '#fff', fontSize: '4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
+                    {bdayName[0]}
+                  </div>
+                )}
+              </motion.div>
+
+              <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }}
+                style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.9rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.2, marginBottom: '0.9rem' }}>
+                {firstName}, {bdayName} is throwing a boat day 🚢
+              </motion.h1>
+
+              <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.32 }}
+                className="text-[0.97rem] leading-[1.85] mb-2" style={{ color: 'var(--riviera-ink-soft)' }}>
+                {party.party_story || `${bdayName} is gathering favorite people for an afternoon on the water. There will be snacks, sunshine, birthday chaos, and at least one group photo we'll pretend was effortless. We'd love you on the crew.`}
+              </motion.p>
+
+              {crew.length > 0 && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+                  className="text-sm mt-3" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  🍋 <span style={{ fontWeight: 700, color: 'var(--coral)' }}>{crew.length}</span>
+                  {crew.length === 1 ? ' friend is' : ' friends'} already aboard
+                </motion.p>
               )}
-              <button
-                onClick={rsvpAccept}
-                disabled={saving}
-                className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all disabled:opacity-50"
-                style={{ background: 'var(--sunny)', color: 'var(--riviera-ink)', boxShadow: '0 8px 24px rgba(255,210,63,0.45)' }}
-              >
-                {saving ? 'One sec…' : "I'm coming aboard 🚢"}
-              </button>
-              <button
-                onClick={rsvpDecline}
-                disabled={saving}
-                className="w-full py-3 mt-1.5 text-sm font-medium"
-                style={{ color: 'var(--riviera-ink-soft)', opacity: 0.55 }}
-              >
-                I can't make it
-              </button>
+
+              <div className="pt-7 pb-4">
+                <button onClick={acceptInvitation} disabled={saving}
+                  className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all disabled:opacity-50"
+                  style={{ background: 'var(--sunny)', color: 'var(--riviera-ink)', boxShadow: '0 8px 24px rgba(255,210,63,0.45)' }}>
+                  {saving ? 'One sec…' : 'I accept the invitation 🎉'}
+                </button>
+                <button onClick={declineInvitation} disabled={saving}
+                  className="w-full py-3 mt-1.5 text-sm font-medium" style={{ color: 'var(--riviera-ink-soft)', opacity: 0.5 }}>
+                  I can't make it
+                </button>
+              </div>
             </motion.div>
           )}
 
-          {/* REVEALED + ACCEPTED */}
-          {(stage === 'revealed' || stage === 'accepted') && (
-            <motion.div
-              key="missions"
-              initial={{ opacity: 0, y: 26 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.94 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.45, delay: 0.05 }}
-                className="text-center mb-6"
-              >
-                <motion.p
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 0.1, type: 'spring', stiffness: 200 }}
-                  style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}
-                >
-                  🎉
-                </motion.p>
-                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.35rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
-                  Yesss. You're officially aboard.
-                </p>
-                <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>
-                  {missionsLive && hasMissions
-                    ? 'Here are your 3 boat-day missions. Made for real life, not your phone.'
-                    : 'Your spot on the boat is locked in. 🌊'}
-                </p>
+          {/* ════════ SCREEN 2 — ROLE REVEAL ════════ */}
+          {step === 'role' && (
+            <motion.div key="role" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
+              className="flex-1 flex flex-col justify-center py-6 text-center">
+
+              <motion.p initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.05, type: 'spring', stiffness: 200 }}
+                style={{ fontSize: '2.4rem', marginBottom: '0.5rem' }}>🎉</motion.p>
+
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
+                style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '1.4rem' }}>
+                You're officially aboard!
+              </motion.p>
+
+              {/* Countdown */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full mx-auto mb-7"
+                style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 6px 20px rgba(255,122,89,0.2)', fontWeight: 700 }}>
+                ⛵ {countdownText}
               </motion.div>
 
-              {/* Missions sealed — not released yet */}
-              {!missionsLive && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.15 }}
-                  className="rounded-3xl px-5 py-6 mb-2 text-center"
-                  style={{ background: '#fff', boxShadow: '0 8px 24px rgba(45,58,74,0.07)', border: '1.5px dashed var(--sunny)' }}
-                >
-                  <p style={{ fontSize: '1.7rem', marginBottom: '0.4rem' }}>🤫</p>
-                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
-                    Your 3 secret missions are sealed
+              {/* Role */}
+              {titlesLive && guest.role_name ? (
+                <motion.div initial={{ opacity: 0, y: 16, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.55, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  className="rounded-3xl px-6 py-7 mb-2"
+                  style={{ background: 'linear-gradient(135deg, var(--sunny-soft) 0%, var(--coral-soft) 100%)', boxShadow: '0 10px 30px rgba(255,180,120,0.26)' }}>
+                  <p style={{ fontSize: '0.62rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--coral)', marginBottom: '0.5rem' }}>
+                    You are now officially the
                   </p>
-                  <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
-                    The Captain releases them closer to the day. We'll let you know the moment they unlock 🍋
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.55rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.2, marginBottom: guest.role_description ? '0.7rem' : 0 }}>
+                    {guest.role_name}
                   </p>
+                  {guest.role_description && (
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>{guest.role_description}</p>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }}
+                  className="rounded-3xl px-6 py-7 mb-2 text-center" style={{ background: '#fff', boxShadow: '0 10px 30px rgba(45,58,74,0.08)', border: '1.5px dashed var(--coral-soft)' }}>
+                  <p style={{ fontSize: '1.7rem', marginBottom: '0.3rem' }}>🎁</p>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
+                    Your title is still with the Captain
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>Revealed closer to departure. Keep an eye out 👀</p>
                 </motion.div>
               )}
 
-              {missionsLive && hasMissions && (
-                <div className="flex flex-col gap-3 mb-7">
-                  {guest.mission_easy && (
-                    <MissionCard level="Easy" badge="🟢" accent="var(--leaf)" tint="var(--leaf-soft)" text={guest.mission_easy} delay={0.12} />
-                  )}
-                  {guest.mission_medium && (
-                    <MissionCard level="Medium" badge="🟡" accent="#e0a93c" tint="var(--sunny-soft)" text={guest.mission_medium} delay={0.22} />
-                  )}
-                  {guest.mission_legendary && (
-                    <MissionCard level="Legendary" badge="🔥" accent="var(--coral)" tint="var(--coral-soft)" text={guest.mission_legendary} delay={0.32} />
-                  )}
-                </div>
-              )}
-
-              <AnimatePresence mode="wait">
-                {missionsLive && stage === 'revealed' && (
-                  <motion.div
-                    key="check"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8, transition: { duration: 0.25 } }}
-                    transition={{ duration: 0.4, delay: 0.38 }}
-                  >
-                    <p style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--riviera-ink-soft)', textAlign: 'center', marginBottom: '0.7rem', opacity: 0.7 }}>
-                      Final check
-                    </p>
-                    <button
-                      onClick={acceptMissions}
-                      disabled={saving}
-                      className="w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl text-left active:scale-[0.98] transition-all disabled:opacity-50"
-                      style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.08)' }}
-                    >
-                      <div className="w-5 h-5 rounded-md flex-shrink-0" style={{ border: '2px solid var(--coral)', background: 'transparent' }} />
-                      <span className="text-sm font-medium" style={{ color: 'var(--riviera-ink)' }}>
-                        {saving ? 'Saving…' : 'I accept my boat-day missions'}
-                      </span>
-                    </button>
-                  </motion.div>
-                )}
-
-                {stage === 'accepted' && (
-                  <motion.div
-                    key="done"
-                    initial={{ opacity: 0, scale: 0.96, y: 6 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                    className="rounded-3xl px-5 py-5 text-center"
-                    style={{ background: 'var(--leaf-soft)', boxShadow: '0 8px 24px rgba(95,174,126,0.18)' }}
-                  >
-                    <p style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>✅</p>
-                    <p className="text-sm font-bold" style={{ color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
-                      Perfect. You're all set.
-                    </p>
-                    <p className="text-xs leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
-                      Remember your missions and enjoy the party. See you on the water 🌊
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div className="pt-7 pb-4">
+                <button onClick={() => setStep('missions')}
+                  className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
+                  style={{ background: 'var(--coral)', color: '#fff', boxShadow: '0 8px 24px rgba(255,122,89,0.4)' }}>
+                  Reveal my missions →
+                </button>
+              </div>
             </motion.div>
           )}
 
-          {/* DECLINED */}
-          {stage === 'declined' && (
-            <motion.div
-              key="declined"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45 }}
-              className="text-center py-2"
-            >
-              <p style={{ fontSize: '1.6rem', marginBottom: '0.5rem' }}>🥲</p>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
-                You'll be missed.<br />Isaac will understand. Probably.
+          {/* ════════ SCREEN 3 — MISSIONS ════════ */}
+          {step === 'missions' && (
+            <motion.div key="missions" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
+              className="flex-1 flex flex-col justify-center py-6">
+
+              <div className="text-center mb-6">
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.45rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
+                  Your 3 boat-day missions
+                </p>
+                <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  Made for real life, not your phone. Pick whichever feel right on the day.
+                </p>
+              </div>
+
+              {missionsLive && missionList.length > 0 ? (
+                <>
+                  <div className="flex flex-col gap-3 mb-2">
+                    {missionList.map((m, i) => (
+                      <MissionCard key={m.level} {...m} delay={0.1 + i * 0.1} />
+                    ))}
+                  </div>
+                  <div className="pt-7 pb-4">
+                    <button onClick={acceptMissions} disabled={saving}
+                      className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all disabled:opacity-50"
+                      style={{ background: 'var(--sunny)', color: 'var(--riviera-ink)', boxShadow: '0 8px 24px rgba(255,210,63,0.45)' }}>
+                      {saving ? 'Saving…' : 'I accept my boat-day missions ✋'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-3xl px-6 py-8 text-center" style={{ background: '#fff', boxShadow: '0 10px 30px rgba(45,58,74,0.08)', border: '1.5px dashed var(--sunny)' }}>
+                    <p style={{ fontSize: '1.9rem', marginBottom: '0.4rem' }}>🤫</p>
+                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
+                      Your missions are sealed
+                    </p>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
+                      The Captain releases them closer to the day. We'll let you know the moment they unlock 🍋
+                    </p>
+                  </div>
+                  <div className="pt-7 pb-4">
+                    <button onClick={() => setStep('allset')}
+                      className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
+                      style={{ background: 'var(--coral)', color: '#fff', boxShadow: '0 8px 24px rgba(255,122,89,0.4)' }}>
+                      Got it — see you on the boat 🌊
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {/* ════════ ALL SET (home base after accepting) ════════ */}
+          {step === 'allset' && (
+            <motion.div key="allset" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
+              className="flex-1 flex flex-col justify-center py-8">
+
+              <div className="text-center mb-7">
+                <p style={{ fontSize: '2.2rem', marginBottom: '0.4rem' }}>✅</p>
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.5rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
+                  You're all set, {firstName}.
+                </p>
+                <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  Remember your missions and enjoy the party. See you on the water 🌊
+                </p>
+              </div>
+
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mx-auto mb-5"
+                style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 16px rgba(255,122,89,0.18)', fontSize: '0.8rem', fontWeight: 700 }}>
+                ⛵ {countdownText}
+              </div>
+
+              {/* Departure details — the practical info lives here */}
+              <div className="rounded-3xl px-5 py-4 mb-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
+                {sectionLabel('Departure details')}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-start gap-3">
+                    <span style={{ fontSize: 15, marginTop: 1 }}>📅</span>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--riviera-ink)' }}>{partyDate}</p>
+                      {party.event_time && <p className="text-xs mt-0.5" style={{ color: 'var(--riviera-ink-soft)' }}>{party.event_time}</p>}
+                    </div>
+                  </div>
+                  {party.event_location && (
+                    <div className="flex items-start gap-3"><span style={{ fontSize: 15, marginTop: 1 }}>📍</span><p className="text-sm" style={{ color: 'var(--riviera-ink)' }}>{party.event_location}</p></div>
+                  )}
+                  {party.meeting_point && (
+                    <div className="flex items-start gap-3"><span style={{ fontSize: 15, marginTop: 1 }}>🚢</span><p className="text-sm" style={{ color: 'var(--riviera-ink)' }}>{party.meeting_point}</p></div>
+                  )}
+                </div>
+              </div>
+
+              {notes.length > 0 && (
+                <div className="rounded-3xl px-5 py-4 mb-4" style={{ background: 'var(--leaf-soft)' }}>
+                  {sectionLabel('Before boarding', 'var(--leaf)')}
+                  <div className="flex flex-col gap-2.5">
+                    {notes.map((n, i) => (
+                      <div key={i} className="flex items-start gap-2.5">
+                        {n.icon && <span style={{ fontSize: 14, marginTop: 1 }}>{n.icon}</span>}
+                        <div>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>{n.text}</p>
+                          {n.link && <a href={n.link} target="_blank" rel="noopener noreferrer" className="text-xs underline" style={{ color: 'var(--leaf)' }}>Open →</a>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {links.length > 0 && (
+                <div className="flex flex-col gap-2 mb-2">
+                  {links.map((l, i) => (
+                    <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-between px-5 py-3.5 rounded-2xl active:scale-95 transition-all"
+                      style={{ background: '#fff', boxShadow: '0 4px 16px rgba(45,58,74,0.06)', color: 'var(--sky)', textDecoration: 'none' }}>
+                      <span className="text-sm font-semibold">{l.label}</span><span style={{ opacity: 0.5, fontSize: 12 }}>↗</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {missionsLive && missionList.length > 0 && (
+                <button onClick={() => setStep('missions')} className="text-sm font-semibold underline mt-3 mx-auto" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  See my missions again
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* ════════ SCREEN 4 — THE CAPTAIN'S LOG ════════ */}
+          {step === 'captainslog' && (
+            <motion.div key="captainslog" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
+              className="flex-1 flex flex-col justify-center py-8">
+
+              <div className="text-center mb-6 pt-4">
+                <motion.p initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, type: 'spring', stiffness: 200 }} style={{ fontSize: '2.4rem', marginBottom: '0.4rem' }}>⛵</motion.p>
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.55rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.4rem' }}>
+                  Boat Day Complete
+                </p>
+                {guest.role_name && (
+                  <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>
+                    You successfully served as <span style={{ fontWeight: 700, color: 'var(--coral)' }}>{guest.role_name}</span>.
+                  </p>
+                )}
+              </div>
+
+              {missionList.length > 0 && (
+                <div className="rounded-3xl px-5 py-4 mb-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
+                  {sectionLabel('Missions completed', 'var(--leaf)')}
+                  <div className="flex flex-col gap-2.5">
+                    {missionList.map(m => (
+                      <div key={m.level} className="flex items-start gap-2.5">
+                        <span style={{ fontSize: 15, marginTop: 1 }}>✅</span>
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>{m.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-3xl px-5 py-5 mb-4 text-center" style={{ background: 'linear-gradient(135deg, var(--coral-soft), var(--blossom))' }}>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>
+                  Thanks for being part of {bdayName}'s birthday. This day wouldn't have been the same without you ❤️
+                </p>
+              </div>
+
+              {/* Leave a note */}
+              <div className="rounded-3xl px-5 py-5 mb-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
+                {sectionLabel(`A message for ${bdayName}`, 'var(--coral)')}
+                <p className="text-sm mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  What do you want {bdayName} to remember from today? A favorite moment, a funny memory, a birthday wish.
+                </p>
+                <textarea value={note} onChange={e => { setNote(e.target.value); setNoteSaved(false) }} rows={4}
+                  placeholder="Type your note…"
+                  className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none"
+                  style={{ background: 'var(--riviera-bg)', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.1)' }} />
+                <button onClick={saveNote} disabled={saving || !note.trim()}
+                  className="w-full py-3.5 mt-3 rounded-2xl font-bold text-sm active:scale-95 transition-all disabled:opacity-40"
+                  style={{ background: noteSaved ? 'var(--leaf-soft)' : 'var(--coral)', color: noteSaved ? 'var(--leaf)' : '#fff' }}>
+                  {saving ? 'Saving…' : noteSaved ? '✓ Saved for ' + bdayName : `Leave a note for ${bdayName}`}
+                </button>
+              </div>
+
+              {/* Photos */}
+              <div className="rounded-3xl px-5 py-5" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
+                {sectionLabel('Share your photos', 'var(--sky)')}
+                <p className="text-sm mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  Got a photo from boat day? Add it to the memory book.
+                </p>
+                {photos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {photos.map((p, i) => (
+                      <img key={i} src={p} alt="" className="w-full aspect-square object-cover rounded-xl" />
+                    ))}
+                  </div>
+                )}
+                <label className="block">
+                  <div className="w-full py-3.5 rounded-2xl font-bold text-sm text-center active:scale-95 transition-all cursor-pointer"
+                    style={{ background: 'var(--sky-soft)', color: 'var(--sky)' }}>
+                    {uploadingPhoto ? 'Uploading…' : '📷 Upload a photo'}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f) }} />
+                </label>
+              </div>
+
+            </motion.div>
+          )}
+
+          {/* ════════ DECLINED ════════ */}
+          {step === 'declined' && (
+            <motion.div key="declined" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
+              className="flex-1 flex flex-col items-center justify-center py-8 text-center">
+              <p style={{ fontSize: '2rem', marginBottom: '0.6rem' }}>🥲</p>
+              <p className="text-base leading-relaxed mb-1" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: 'var(--riviera-ink)' }}>
+                You'll be missed.
               </p>
-              <button
-                onClick={rsvpAccept}
-                className="text-sm font-semibold mt-5 underline"
-                style={{ color: 'var(--coral)' }}
-              >
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
+                {bdayName} will understand. Probably.
+              </p>
+              <button onClick={acceptInvitation} className="text-sm font-semibold mt-6 underline" style={{ color: 'var(--coral)' }}>
                 Wait — actually I can make it
               </button>
             </motion.div>
@@ -689,14 +613,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
         </AnimatePresence>
 
-        {/* Footer */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="text-center mt-12"
-          style={{ color: 'var(--riviera-ink-soft)', opacity: 0.4, fontSize: '0.58rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}
-        >
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}
+          className="text-center pb-6 pt-2" style={{ color: 'var(--riviera-ink-soft)', opacity: 0.4, fontSize: '0.58rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
           Made with love by Pili
         </motion.p>
 

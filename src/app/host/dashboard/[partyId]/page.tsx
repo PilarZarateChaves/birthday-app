@@ -44,6 +44,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [addError, setAddError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
+  const [bdayUploading, setBdayUploading] = useState(false)
 
   useEffect(() => {
     if (!localStorage.getItem('host_auth')) { router.replace('/host'); return }
@@ -160,6 +161,27 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     setParty(p => p ? { ...p, [field]: next } : p)
   }
 
+  async function toggleEnded() {
+    if (!party) return
+    const next = party.status === 'ended' ? 'live' : 'ended'
+    await supabase.from('parties').update({ status: next }).eq('id', partyId)
+    setParty(p => p ? { ...p, status: next } : p)
+  }
+
+  async function uploadBirthdayPhoto(file: File) {
+    if (!party || bdayUploading) return
+    setBdayUploading(true)
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+    const path = `birthday/${partyId}/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('party-media').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('party-media').getPublicUrl(path)
+      await supabase.from('parties').update({ birthday_person_photo: data.publicUrl }).eq('id', partyId)
+      setParty(p => p ? { ...p, birthday_person_photo: data.publicUrl } : p)
+    }
+    setBdayUploading(false)
+  }
+
   const inputStyle = { background: 'rgba(255,255,255,0.07)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }
   const labelStyle = { color: 'rgba(201,168,76,0.7)', fontSize: '0.65rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, display: 'block', marginBottom: '0.3rem' }
 
@@ -168,10 +190,28 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   return (
     <main className="min-h-screen px-5 py-8" style={{ background: '#0f1a30' }}>
       <div className="max-w-lg mx-auto">
-        <p className="text-xs tracking-[0.4em] uppercase mb-1" style={{ color: 'rgba(201,168,76,0.6)' }}>Host Dashboard</p>
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>
-          {party?.party_title}
-        </h1>
+        <p className="text-xs tracking-[0.4em] uppercase mb-3" style={{ color: 'rgba(201,168,76,0.6)' }}>Host Dashboard</p>
+
+        {/* Birthday person photo — the invitation anchor */}
+        <div className="flex items-center gap-4 mb-3">
+          <label className="cursor-pointer flex-shrink-0">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center" style={{ background: 'rgba(201,168,76,0.12)', border: '2px solid rgba(201,168,76,0.3)' }}>
+              {party?.birthday_person_photo
+                ? <img src={party.birthday_person_photo} alt="" className="w-full h-full object-cover" />
+                : <span className="text-2xl">{bdayUploading ? '⏳' : '📷'}</span>}
+            </div>
+            <input type="file" accept="image/*" className="hidden" disabled={bdayUploading}
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadBirthdayPhoto(f) }} />
+          </label>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold leading-tight" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>
+              {party?.party_title}
+            </h1>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(201,168,76,0.55)' }}>
+              {party?.birthday_person_photo ? `Tap photo to change ${party?.birthday_person_name}'s portrait` : `Tap to add ${party?.birthday_person_name}'s photo`}
+            </p>
+          </div>
+        </div>
         <p className="text-sm mb-6" style={{ color: 'rgba(253,246,227,0.35)' }}>
           {party?.party_date} · {party?.event_time} · {guests.length} guests
         </p>
@@ -206,6 +246,25 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                 </button>
               </div>
             ))}
+
+            {/* End the voyage — unlocks the Captain's Log (after you Approve each guest's missions) */}
+            <div className="flex items-center justify-between py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--cream)' }}>The Captain's Log</p>
+                <p className="text-xs" style={{ color: 'rgba(253,246,227,0.3)' }}>
+                  {party.status === 'ended' ? '🟢 Open · Approve a guest to unlock theirs' : '🔒 Opens after the voyage ends'}
+                </p>
+              </div>
+              <button
+                onClick={toggleEnded}
+                className="px-4 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                style={party.status === 'ended'
+                  ? { background: 'rgba(107,127,94,0.2)', color: '#a8c99a', border: '1px solid rgba(107,127,94,0.35)' }
+                  : { background: 'var(--terracotta)', color: 'var(--cream)' }}
+              >
+                {party.status === 'ended' ? 'Reopen voyage' : 'End the voyage'}
+              </button>
+            </div>
           </div>
         )}
 
@@ -259,6 +318,20 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
               {guest.submission_url && (
                 <img src={guest.submission_url} alt="" className="w-full rounded-xl mt-3 object-cover" style={{ maxHeight: 140 }} />
+              )}
+
+              {guest.memory_favorite_moment && (
+                <p className="text-xs mt-3 px-3 py-2 rounded-xl leading-relaxed" style={{ background: 'rgba(196,98,45,0.1)', color: 'rgba(253,246,227,0.7)', borderLeft: '2px solid var(--terracotta)' }}>
+                  ❝ {guest.memory_favorite_moment} ❞
+                </p>
+              )}
+
+              {Array.isArray(guest.memory_photos) && guest.memory_photos.length > 0 && (
+                <div className="grid grid-cols-4 gap-1.5 mt-3">
+                  {guest.memory_photos.map((p, i) => (
+                    <img key={i} src={p} alt="" className="w-full aspect-square object-cover rounded-lg" />
+                  ))}
+                </div>
               )}
             </div>
           ))}

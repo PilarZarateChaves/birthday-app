@@ -64,6 +64,7 @@ export interface Guest {
   memory_appreciation: string | null
   memory_favorite_moment: string | null
   memory_future_prediction: string | null
+  memory_photos: string[]
   invite_code: string | null
   is_host: boolean
   created_at: string
