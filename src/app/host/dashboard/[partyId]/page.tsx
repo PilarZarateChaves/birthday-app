@@ -41,6 +41,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   })
   const [selectedTemplate, setSelectedTemplate] = useState(-1)
   const [addingGuest, setAddingGuest] = useState(false)
+  const [addError, setAddError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
 
@@ -80,49 +81,71 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   }
 
   async function handleAddGuest() {
-    if (!newGuest.name.trim()) return
+    if (!newGuest.name.trim() || addingGuest) return
     setAddingGuest(true)
+    setAddError('')
 
-    let photoUrl = ''
-    if (photoFile) {
-      const ext = photoFile.name.split('.').pop()
-      const path = `guests/${partyId}/${Date.now()}.${ext}`
-      const { error: uploadErr } = await supabase.storage.from('party-media').upload(path, photoFile)
-      if (!uploadErr) {
-        const { data } = supabase.storage.from('party-media').getPublicUrl(path)
-        photoUrl = data.publicUrl
+    try {
+      let photoUrl = ''
+      if (photoFile) {
+        const ext = (photoFile.name.split('.').pop() || 'jpg').toLowerCase()
+        const path = `guests/${partyId}/${Date.now()}.${ext}`
+        const { error: uploadErr } = await supabase.storage
+          .from('party-media')
+          .upload(path, photoFile, { upsert: true })
+        if (uploadErr) {
+          // Photo is optional — don't block adding the guest, just note it.
+          console.warn('Photo upload failed:', uploadErr.message)
+        } else {
+          const { data } = supabase.storage.from('party-media').getPublicUrl(path)
+          photoUrl = data.publicUrl
+        }
       }
+
+      const code = genCode()
+      const { data: guest, error } = await supabase
+        .from('guests')
+        .insert({
+          party_id: partyId,
+          name: newGuest.name.trim(),
+          email: `${newGuest.name.toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@gondolieri.local`,
+          photo: photoUrl || null,
+          role_name: newGuest.role_name || null,
+          role_description: newGuest.role_description || null,
+          mission_easy: newGuest.mission_easy || null,
+          mission_medium: newGuest.mission_medium || null,
+          mission_legendary: newGuest.mission_legendary || null,
+          mission_status: 'in_progress',
+          rsvp_status: 'pending',
+          mission_accepted: false,
+          invite_code: code,
+          is_host: false,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        setAddError(error.message || 'Could not add guest. Please try again.')
+        return
+      }
+
+      if (guest) {
+        setGuests(g => [...g, guest])
+      } else {
+        // Insert succeeded but row not returned (e.g. RLS on select) — reload from DB.
+        await load()
+      }
+
+      setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' })
+      setPhotoFile(null)
+      setPhotoPreview('')
+      setSelectedTemplate(-1)
+      setShowAddGuest(false)
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : 'Something went wrong adding the guest.')
+    } finally {
+      setAddingGuest(false)
     }
-
-    const code = genCode()
-    const { data: guest } = await supabase
-      .from('guests')
-      .insert({
-        party_id: partyId,
-        name: newGuest.name.trim(),
-        email: `${newGuest.name.toLowerCase().replace(/\s+/g, '.')}.${Date.now()}@gondolieri.local`,
-        photo: photoUrl || null,
-        role_name: newGuest.role_name || null,
-        role_description: newGuest.role_description || null,
-        mission_easy: newGuest.mission_easy || null,
-        mission_medium: newGuest.mission_medium || null,
-        mission_legendary: newGuest.mission_legendary || null,
-        mission_status: 'in_progress',
-        rsvp_status: 'pending',
-        mission_accepted: false,
-        invite_code: code,
-        is_host: false,
-      })
-      .select()
-      .single()
-
-    if (guest) setGuests(g => [...g, guest])
-    setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' })
-    setPhotoFile(null)
-    setPhotoPreview('')
-    setSelectedTemplate(-1)
-    setShowAddGuest(false)
-    setAddingGuest(false)
   }
 
   async function approveGuest(id: string) {
@@ -338,6 +361,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   <textarea value={newGuest.mission_legendary} onChange={e => setNewGuest(g => ({ ...g, mission_legendary: e.target.value }))} rows={2} placeholder="Help create a group photo that actually looks fun…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
                 </div>
               </div>
+
+              {addError && (
+                <p className="text-sm mb-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(196,98,45,0.15)', color: '#f0a07a', border: '1px solid rgba(196,98,45,0.3)' }}>
+                  {addError}
+                </p>
+              )}
 
               <button
                 onClick={handleAddGuest}
