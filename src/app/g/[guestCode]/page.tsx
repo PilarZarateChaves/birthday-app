@@ -266,6 +266,10 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const hasMissions = !!(guest.mission_easy || guest.mission_medium || guest.mission_legendary)
   const firstName = guest.name.split(' ')[0]
 
+  // Host-paced reveals (the "drip"). Default to live if the column predates this build.
+  const titlesLive = party.reveal_titles ?? true
+  const missionsLive = party.reveal_missions ?? true
+
   return (
     <main className="min-h-screen pb-20 relative overflow-hidden" style={{ background: 'var(--riviera-bg)' }}>
 
@@ -363,7 +367,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
         )}
 
         {/* ── ROLE CARD ── */}
-        {guest.role_name && (
+        {guest.role_name && titlesLive && (
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
@@ -392,6 +396,25 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 {guest.role_description}
               </p>
             )}
+          </motion.div>
+        )}
+
+        {/* ── ROLE CARD — sealed teaser (title not released yet) ── */}
+        {guest.role_name && !titlesLive && (
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="rounded-3xl px-5 py-5 mb-4 text-center"
+            style={{ background: '#fff', boxShadow: '0 8px 26px rgba(45,58,74,0.07)', border: '1.5px dashed var(--coral-soft)' }}
+          >
+            <p style={{ fontSize: '1.6rem', marginBottom: '0.3rem' }}>🎁</p>
+            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
+              Your title is still with the Captain
+            </p>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
+              Boat-day titles are revealed closer to departure. Keep an eye out 👀
+            </p>
           </motion.div>
         )}
 
@@ -554,11 +577,32 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   Yesss. You're officially aboard.
                 </p>
                 <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>
-                  Here are your 3 boat-day missions. Made for real life, not your phone.
+                  {missionsLive && hasMissions
+                    ? 'Here are your 3 boat-day missions. Made for real life, not your phone.'
+                    : 'Your spot on the boat is locked in. 🌊'}
                 </p>
               </motion.div>
 
-              {hasMissions && (
+              {/* Missions sealed — not released yet */}
+              {!missionsLive && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.15 }}
+                  className="rounded-3xl px-5 py-6 mb-2 text-center"
+                  style={{ background: '#fff', boxShadow: '0 8px 24px rgba(45,58,74,0.07)', border: '1.5px dashed var(--sunny)' }}
+                >
+                  <p style={{ fontSize: '1.7rem', marginBottom: '0.4rem' }}>🤫</p>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
+                    Your 3 secret missions are sealed
+                  </p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
+                    The Captain releases them closer to the day. We'll let you know the moment they unlock 🍋
+                  </p>
+                </motion.div>
+              )}
+
+              {missionsLive && hasMissions && (
                 <div className="flex flex-col gap-3 mb-7">
                   {guest.mission_easy && (
                     <MissionCard level="Easy" badge="🟢" accent="var(--leaf)" tint="var(--leaf-soft)" text={guest.mission_easy} delay={0.12} />
@@ -573,7 +617,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
               )}
 
               <AnimatePresence mode="wait">
-                {stage === 'revealed' && (
+                {missionsLive && stage === 'revealed' && (
                   <motion.div
                     key="check"
                     initial={{ opacity: 0, y: 10 }}

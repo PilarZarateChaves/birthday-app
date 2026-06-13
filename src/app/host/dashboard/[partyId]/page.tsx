@@ -130,6 +130,13 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     setGuests(g => g.map(x => x.id === id ? { ...x, mission_status: 'approved' } : x))
   }
 
+  async function toggleReveal(field: 'reveal_titles' | 'reveal_missions') {
+    if (!party) return
+    const next = !party[field]
+    await supabase.from('parties').update({ [field]: next }).eq('id', partyId)
+    setParty(p => p ? { ...p, [field]: next } : p)
+  }
+
   const inputStyle = { background: 'rgba(255,255,255,0.07)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }
   const labelStyle = { color: 'rgba(201,168,76,0.7)', fontSize: '0.65rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, display: 'block', marginBottom: '0.3rem' }
 
@@ -142,9 +149,42 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>
           {party?.party_title}
         </h1>
-        <p className="text-sm mb-8" style={{ color: 'rgba(253,246,227,0.35)' }}>
+        <p className="text-sm mb-6" style={{ color: 'rgba(253,246,227,0.35)' }}>
           {party?.party_date} · {party?.event_time} · {guests.length} guests
         </p>
+
+        {/* Build anticipation — the drip */}
+        {party && (
+          <div className="rounded-2xl p-4 mb-6" style={{ background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.18)' }}>
+            <p className="text-xs tracking-[0.18em] uppercase mb-1" style={{ color: 'rgba(201,168,76,0.7)' }}>Build anticipation</p>
+            <p className="text-xs mb-4" style={{ color: 'rgba(253,246,227,0.3)' }}>
+              Drip the surprises. Flip one on, then text everyone to peek at their invitation.
+            </p>
+
+            {[
+              { field: 'reveal_titles' as const, on: !!party.reveal_titles, label: 'Boat-day titles', hint: 'Guests can see their role' },
+              { field: 'reveal_missions' as const, on: !!party.reveal_missions, label: 'Secret missions', hint: 'Missions unlock after RSVP' },
+            ].map(row => (
+              <div key={row.field} className="flex items-center justify-between py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--cream)' }}>{row.label}</p>
+                  <p className="text-xs" style={{ color: 'rgba(253,246,227,0.3)' }}>
+                    {row.on ? '🟢 Revealed to crew' : `🔒 Sealed · ${row.hint}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => toggleReveal(row.field)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                  style={row.on
+                    ? { background: 'rgba(107,127,94,0.2)', color: '#a8c99a', border: '1px solid rgba(107,127,94,0.35)' }
+                    : { background: 'var(--gold)', color: 'var(--navy)' }}
+                >
+                  {row.on ? 'Hide again' : 'Reveal now'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Guest list */}
         <div className="flex flex-col gap-3 mb-5">

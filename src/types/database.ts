@@ -29,6 +29,8 @@ export interface Party {
   meeting_point: string | null
   event_notes: NoteBlock[]
   event_links: EventLink[]
+  reveal_titles: boolean
+  reveal_missions: boolean
   theme: string
   adult_count: number
   kid_count: number

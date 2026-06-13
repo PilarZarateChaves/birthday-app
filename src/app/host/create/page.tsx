@@ -74,6 +74,8 @@ export default function CreateParty() {
           meeting_point: form.meeting_point,
           event_notes: notes,
           event_links: links,
+          reveal_titles: true,
+          reveal_missions: false,
           theme: 'gondolieri',
           adult_count: 0,
           kid_count: 0,
