@@ -11,6 +11,20 @@
   --sage: #6b7f5e;
   --plum: #1c0f20;
   --card-cream: #fdf8ef;
+
+  /* Riviera palette — light, joyful, Mediterranean */
+  --riviera-bg: #fff9ee;
+  --riviera-ink: #2d3a4a;
+  --riviera-ink-soft: #5b6a7d;
+  --sky: #5fb6e6;
+  --sky-soft: #c7e8f7;
+  --coral: #ff7a59;
+  --coral-soft: #ffd9cd;
+  --sunny: #ffd23f;
+  --sunny-soft: #fff0b3;
+  --leaf: #5fae7e;
+  --leaf-soft: #cfedda;
+  --blossom: #f7a8c4;
 }
 
 body {
