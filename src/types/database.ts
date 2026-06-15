@@ -7,9 +7,19 @@ export type RsvpStatus = 'pending' | 'accepted' | 'declined'
 
 export interface NoteBlock {
   icon?: string
+  title?: string
   text: string
   link?: string
+  button_label?: string
 }
+
+export interface MissionProgressEntry {
+  done?: boolean
+  note?: string
+  media?: string[]
+}
+
+export type MissionProgress = Record<string, MissionProgressEntry>
 
 export interface EventLink {
   label: string
@@ -66,6 +76,7 @@ export interface Guest {
   memory_favorite_moment: string | null
   memory_future_prediction: string | null
   memory_photos: string[]
+  mission_progress: MissionProgress
   invite_code: string | null
   is_host: boolean
   created_at: string

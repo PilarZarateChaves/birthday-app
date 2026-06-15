@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, use, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import type { Party, Guest } from '@/types/database'
+import type { Party, Guest, MissionProgress } from '@/types/database'
 
 type Step = 'invitation' | 'role' | 'missions' | 'allset' | 'captainslog' | 'declined'
 type CrewMate = { name: string; photo: string | null }
@@ -247,6 +247,13 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [photos, setPhotos] = useState<string[]>([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
+  // Mission progress (final screen)
+  const [progress, setProgress] = useState<MissionProgress>({})
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({})
+  const [activeMission, setActiveMission] = useState(0)
+  const [missionDir, setMissionDir] = useState(1)
+  const [evidenceBusy, setEvidenceBusy] = useState<string | null>(null)
+
   async function loadCrew(partyId: string) {
     const { data } = await supabase.from('guests').select('name, photo').eq('party_id', partyId).eq('rsvp_status', 'accepted')
     if (data) setCrew(data as CrewMate[])
@@ -271,6 +278,9 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
         setParty(p)
         setNote(g.memory_favorite_moment ?? '')
         setPhotos(Array.isArray(g.memory_photos) ? g.memory_photos : [])
+        const mp = (g.mission_progress && typeof g.mission_progress === 'object') ? g.mission_progress : {}
+        setProgress(mp)
+        setNoteDrafts(Object.fromEntries(Object.entries(mp).map(([k, v]) => [k, v?.note ?? ''])))
         const ended = p?.status === 'ended'
         const start: Step =
           g.rsvp_status === 'declined' ? 'declined'
@@ -338,6 +348,42 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     setUploadingPhoto(false)
   }
 
+  // ── Mission progress (final screen) ──
+  async function persistProgress(next: MissionProgress) {
+    setProgress(next)
+    if (guest) await supabase.from('guests').update({ mission_progress: next }).eq('id', guest.id)
+  }
+
+  function toggleMissionDone(key: string) {
+    const cur = progress[key] ?? {}
+    persistProgress({ ...progress, [key]: { ...cur, done: !cur.done } })
+  }
+
+  function saveMissionNote(key: string) {
+    const cur = progress[key] ?? {}
+    persistProgress({ ...progress, [key]: { ...cur, note: noteDrafts[key] ?? '' } })
+  }
+
+  async function uploadEvidence(key: string, file: File) {
+    if (!guest || !party || evidenceBusy) return
+    setEvidenceBusy(key)
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+    const path = `evidence/${party.id}/${guest.id}/${key}/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('party-media').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('party-media').getPublicUrl(path)
+      const cur = progress[key] ?? {}
+      const media = [...(cur.media ?? []), data.publicUrl]
+      await persistProgress({ ...progress, [key]: { ...cur, media } })
+    }
+    setEvidenceBusy(null)
+  }
+
+  function goMission(dir: number, count: number) {
+    setMissionDir(dir)
+    setActiveMission(i => Math.min(count - 1, Math.max(0, i + dir)))
+  }
+
   if (loading) return <main className="min-h-screen" style={{ background: 'var(--riviera-bg)' }} />
 
   if (notFound || !guest || !party) return (
@@ -370,10 +416,10 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const titlesLive = party.reveal_titles ?? true
   const missionsLive = party.reveal_missions ?? true
   const missionList = [
-    guest.mission_easy && { level: 'Easy', badge: '🟢', accent: 'var(--leaf)', tint: 'var(--leaf-soft)', text: guest.mission_easy },
-    guest.mission_medium && { level: 'Medium', badge: '🟡', accent: '#e0a93c', tint: 'var(--sunny-soft)', text: guest.mission_medium },
-    guest.mission_legendary && { level: 'Legendary', badge: '🔥', accent: 'var(--coral)', tint: 'var(--coral-soft)', text: guest.mission_legendary },
-  ].filter(Boolean) as { level: string; badge: string; accent: string; tint: string; text: string }[]
+    guest.mission_easy && { key: 'easy', level: 'Easy', badge: '🟢', icon: '🌊', reward: 'Warm-up points', accent: 'var(--leaf)', tint: 'var(--leaf-soft)', text: guest.mission_easy },
+    guest.mission_medium && { key: 'medium', level: 'Medium', badge: '🟡', icon: '🥂', reward: 'Crew respect', accent: '#e0a93c', tint: 'var(--sunny-soft)', text: guest.mission_medium },
+    guest.mission_legendary && { key: 'legendary', level: 'Legendary', badge: '🔥', icon: '🏆', reward: 'Eternal glory', accent: 'var(--coral)', tint: 'var(--coral-soft)', text: guest.mission_legendary },
+  ].filter(Boolean) as { key: string; level: string; badge: string; icon: string; reward: string; accent: string; tint: string; text: string }[]
 
   const stepIn = { opacity: 0, x: 36 }
   const stepAnim = { opacity: 1, x: 0 }
@@ -384,6 +430,14 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     <p style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color, marginBottom: '0.8rem' }}>{text}</p>
   )
 
+  const missionCardVariants = {
+    enter: (d: number) => ({ opacity: 0, x: d > 0 ? 70 : -70, scale: 0.96 }),
+    center: { opacity: 1, x: 0, scale: 1 },
+    exit: (d: number) => ({ opacity: 0, x: d > 0 ? -70 : 70, scale: 0.96 }),
+  }
+  const activeIdx = Math.min(activeMission, Math.max(0, missionList.length - 1))
+  const isVideo = (url: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url)
+
   return (
     <main className="min-h-screen relative overflow-hidden" style={{ background: 'var(--riviera-bg)' }}>
       {/* Gradient blobs */}
@@ -392,7 +446,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
       <div className="fixed pointer-events-none" style={{ bottom: '-14%', left: '-10%', width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(95,182,230,0.32) 0%, transparent 70%)', filter: 'blur(26px)' }} />
       <div className="fixed pointer-events-none" style={{ bottom: '6%', right: '-16%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(247,168,196,0.34) 0%, transparent 70%)', filter: 'blur(22px)' }} />
 
-      {(step === 'invitation' || step === 'role') && <MarinaBackdrop />}
+      {(step === 'invitation' || step === 'role' || step === 'allset') && <MarinaBackdrop />}
 
       {showConfetti && <Confetti />}
 
@@ -568,7 +622,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 <>
                   <div className="flex flex-col gap-3 mb-2">
                     {missionList.map((m, i) => (
-                      <MissionCard key={m.level} {...m} delay={0.1 + i * 0.1} />
+                      <MissionCard key={m.key} level={m.level} badge={m.badge} accent={m.accent} tint={m.tint} text={m.text} delay={0.1 + i * 0.1} />
                     ))}
                   </div>
                   <div className="pt-7 pb-4">
@@ -605,23 +659,165 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
           {/* ════════ ALL SET (home base after accepting) ════════ */}
           {step === 'allset' && (
             <motion.div key="allset" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
-              className="flex-1 flex flex-col justify-center py-8">
+              className="flex-1 py-6">
 
-              <div className="text-center mb-6">
-                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--leaf)' }}>
-                  ✅ You're all set, {firstName}
-                </p>
-                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--riviera-ink)' }}>
-                  Your missions are accepted. Now the countdown begins.
-                </p>
+              {/* ── HERO: birthday photo + floating countdown ── */}
+              <div className="relative mb-7">
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }}
+                  className="rounded-[2rem] overflow-hidden relative mx-auto" style={{ width: '100%', border: '7px solid #fff', boxShadow: '0 22px 54px rgba(45,58,74,0.26)', ...(party.birthday_person_photo ? {} : { aspectRatio: '9 / 10' }) }}>
+                  {party.birthday_person_photo ? (
+                    <img src={party.birthday_person_photo} alt={bdayName} className="w-full" decoding="async" draggable={false} style={{ display: 'block', height: 'auto' }} />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '6rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{bdayName[0]}</div>
+                  )}
+                  <PhotoWaves />
+                </motion.div>
+
+                {/* Floating countdown badge overlapping the bottom of the photo */}
+                <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
+                  className="relative mx-auto rounded-3xl px-4 py-5"
+                  style={{ width: '92%', marginTop: -46, background: '#fff', boxShadow: '0 18px 44px rgba(45,58,74,0.18)', zIndex: 6 }}>
+                  <CountdownHero target={targetMs} subline="The crew is assembling. See you on the water 🌊" />
+                </motion.div>
               </div>
 
-              {/* Countdown — the hero of the final screen */}
-              <div className="mb-8">
-                <CountdownHero target={targetMs} subline="The crew is assembling. See you on the water 🌊" />
-              </div>
+              {/* ── MISSIONS: swipeable deck ── */}
+              {missionsLive && missionList.length > 0 && (() => {
+                const m = missionList[activeIdx]
+                const p = progress[m.key] ?? {}
+                const done = !!p.done
+                const media = p.media ?? []
+                return (
+                  <div className="mb-7">
+                    <p className="text-center mb-1" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--riviera-ink)' }}>
+                      🎯 You have {missionList.length} mission{missionList.length === 1 ? '' : 's'} to accomplish
+                    </p>
+                    <p className="text-center text-xs mb-4" style={{ color: 'var(--riviera-ink-soft)' }}>
+                      Mission {activeIdx + 1} of {missionList.length} · swipe to flip through
+                    </p>
 
-              {/* Departure details — the practical info lives here */}
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => goMission(-1, missionList.length)} disabled={activeIdx === 0} aria-label="Previous mission"
+                        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg disabled:opacity-25 transition-all active:scale-90"
+                        style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 14px rgba(45,58,74,0.1)' }}>‹</button>
+
+                      <div className="flex-1 relative" style={{ minHeight: 250 }}>
+                        <AnimatePresence custom={missionDir} mode="wait">
+                          <motion.div key={m.key} custom={missionDir} variants={missionCardVariants}
+                            initial="enter" animate="center" exit="exit" transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                            drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={0.18}
+                            onDragEnd={(_, info) => {
+                              if (info.offset.x < -55 && activeIdx < missionList.length - 1) goMission(1, missionList.length)
+                              else if (info.offset.x > 55 && activeIdx > 0) goMission(-1, missionList.length)
+                            }}
+                            className="rounded-3xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 12px 34px rgba(45,58,74,0.12)', cursor: 'grab' }}>
+                            <div style={{ height: 6, background: m.accent }} />
+                            <div className="px-5 py-5" style={{ background: m.tint }}>
+                              <div className="flex items-center justify-between mb-3">
+                                <span style={{ fontSize: '2rem' }}>{m.icon}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: '#fff', color: m.accent }}>{m.badge} {m.level}</span>
+                                </div>
+                              </div>
+                              <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--riviera-ink)', minHeight: 64 }}>{m.text}</p>
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <span className="text-xs font-semibold" style={{ color: m.accent }}>🎁 {m.reward}</span>
+                                <span className="text-xs font-bold" style={{ color: done ? 'var(--leaf)' : '#c79a3c' }}>
+                                  {done ? '✅ Mission accomplished' : '🟡 In progress'}
+                                </span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </AnimatePresence>
+                      </div>
+
+                      <button onClick={() => goMission(1, missionList.length)} disabled={activeIdx === missionList.length - 1} aria-label="Next mission"
+                        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg disabled:opacity-25 transition-all active:scale-90"
+                        style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 14px rgba(45,58,74,0.1)' }}>›</button>
+                    </div>
+
+                    {/* dots */}
+                    <div className="flex items-center justify-center gap-1.5 mt-3">
+                      {missionList.map((mm, i) => (
+                        <div key={mm.key} style={{ width: i === activeIdx ? 18 : 6, height: 6, borderRadius: 99, background: i === activeIdx ? 'var(--coral)' : 'rgba(45,58,74,0.16)', transition: 'all 0.3s ease' }} />
+                      ))}
+                    </div>
+
+                    {/* progress controls + evidence for the active mission */}
+                    <div className="mt-4 rounded-3xl px-5 py-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
+                      <button onClick={() => toggleMissionDone(m.key)}
+                        className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+                        style={done ? { background: 'var(--leaf-soft)', color: 'var(--leaf)' } : { background: 'var(--leaf)', color: '#fff' }}>
+                        {done ? '✅ Accomplished — tap to undo' : 'Mark this mission accomplished'}
+                      </button>
+
+                      {done && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="overflow-hidden">
+                          <p className="text-sm font-semibold mt-4 mb-1" style={{ color: 'var(--riviera-ink)' }}>Got proof? We want to see it 😎</p>
+                          <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Tell future historians what happened. This goes in the memory book.</p>
+
+                          <textarea
+                            value={noteDrafts[m.key] ?? ''}
+                            onChange={e => setNoteDrafts(d => ({ ...d, [m.key]: e.target.value }))}
+                            onBlur={() => saveMissionNote(m.key)}
+                            rows={3} placeholder="Tell us what happened…"
+                            className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none mb-3"
+                            style={{ background: 'var(--riviera-bg)', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.1)' }} />
+
+                          {media.length > 0 && (
+                            <div className="grid grid-cols-3 gap-2 mb-3">
+                              {media.map((url, i) => (
+                                isVideo(url)
+                                  ? <video key={i} src={url} controls className="w-full aspect-square object-cover rounded-xl" />
+                                  : <img key={i} src={url} alt="" className="w-full aspect-square object-cover rounded-xl" />
+                              ))}
+                            </div>
+                          )}
+
+                          <label className="block">
+                            <div className="w-full py-3 rounded-2xl font-bold text-sm text-center active:scale-95 transition-all cursor-pointer"
+                              style={{ background: 'var(--sky-soft)', color: 'var(--sky)' }}>
+                              {evidenceBusy === m.key ? 'Uploading…' : '📷 Upload photo or video'}
+                            </div>
+                            <input type="file" accept="image/*,video/*" className="hidden" disabled={!!evidenceBusy}
+                              onChange={e => { const f = e.target.files?.[0]; if (f) uploadEvidence(m.key, f) }} />
+                          </label>
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── CAPTAIN'S NOTES ── */}
+              {notes.length > 0 && (
+                <div className="rounded-3xl px-5 py-5 mb-4" style={{ background: 'var(--leaf-soft)' }}>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.2rem' }}>
+                    📝 Captain's Notes
+                  </p>
+                  <p className="text-xs mb-4" style={{ color: 'var(--riviera-ink-soft)' }}>A few tiny things from the captain before we set sail.</p>
+                  <div className="flex flex-col gap-3.5">
+                    {notes.map((n, i) => (
+                      <div key={i} className="flex items-start gap-2.5">
+                        {n.icon && <span style={{ fontSize: 17, marginTop: 1, flexShrink: 0 }}>{n.icon}</span>}
+                        <div className="flex-1">
+                          {n.title && <p className="text-sm font-bold" style={{ color: 'var(--riviera-ink)' }}>{n.title}</p>}
+                          <p className="text-sm leading-relaxed" style={{ color: n.title ? 'var(--riviera-ink-soft)' : 'var(--riviera-ink)' }}>{n.text}</p>
+                          {n.link && (
+                            <a href={n.link} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-2 px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
+                              style={{ background: 'var(--leaf)', color: '#fff', textDecoration: 'none' }}>
+                              {n.button_label || 'Open'} →
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── DEPARTURE DETAILS ── */}
               <div className="rounded-3xl px-5 py-4 mb-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
                 {sectionLabel('Departure details')}
                 <div className="flex flex-col gap-2.5">
@@ -641,23 +837,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 </div>
               </div>
 
-              {notes.length > 0 && (
-                <div className="rounded-3xl px-5 py-4 mb-4" style={{ background: 'var(--leaf-soft)' }}>
-                  {sectionLabel('Before boarding', 'var(--leaf)')}
-                  <div className="flex flex-col gap-2.5">
-                    {notes.map((n, i) => (
-                      <div key={i} className="flex items-start gap-2.5">
-                        {n.icon && <span style={{ fontSize: 14, marginTop: 1 }}>{n.icon}</span>}
-                        <div>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>{n.text}</p>
-                          {n.link && <a href={n.link} target="_blank" rel="noopener noreferrer" className="text-xs underline" style={{ color: 'var(--leaf)' }}>Open →</a>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {links.length > 0 && (
                 <div className="flex flex-col gap-2 mb-2">
                   {links.map((l, i) => (
@@ -668,12 +847,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                     </a>
                   ))}
                 </div>
-              )}
-
-              {missionsLive && missionList.length > 0 && (
-                <button onClick={() => setStep('missions')} className="text-sm font-semibold underline mt-3 mx-auto" style={{ color: 'var(--riviera-ink-soft)' }}>
-                  See my missions again
-                </button>
               )}
             </motion.div>
           )}

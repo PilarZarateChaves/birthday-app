@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import type { Party, Guest } from '@/types/database'
+import type { Party, Guest, NoteBlock } from '@/types/database'
 import { GONDOLIERI_ROLES } from '@/lib/missions'
 
 function genCode() {
@@ -54,6 +54,10 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [savingCopy, setSavingCopy] = useState(false)
   const [copySaved, setCopySaved] = useState(false)
   const [copyError, setCopyError] = useState('')
+  const [showNotesEditor, setShowNotesEditor] = useState(false)
+  const [noteBlocks, setNoteBlocks] = useState<NoteBlock[]>([])
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [notesSaved, setNotesSaved] = useState(false)
 
   useEffect(() => {
     if (!localStorage.getItem('host_auth')) { router.replace('/host'); return }
@@ -69,6 +73,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     if (p) {
       setHeadlineDraft(p.invite_headline ?? `{name}, ${p.birthday_person_name} is throwing a boat day 🚢`)
       setStoryDraft(p.party_story ?? '')
+      setNoteBlocks(Array.isArray(p.event_notes) ? p.event_notes : [])
     }
     setGuests((g ?? []).filter((x: Guest) => x.name))
     setLoading(false)
@@ -100,6 +105,44 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
       setCopyError(retry.error.message)
     }
     setSavingCopy(false)
+  }
+
+  // ── Captain's Notes (event_notes) ──
+  function updateNote(i: number, field: keyof NoteBlock, value: string) {
+    setNoteBlocks(n => n.map((x, j) => j === i ? { ...x, [field]: value } : x)); setNotesSaved(false)
+  }
+  function addNote() {
+    setNoteBlocks(n => [...n, { icon: '', title: '', text: '', link: '', button_label: '' }]); setNotesSaved(false)
+  }
+  function removeNoteBlock(i: number) {
+    setNoteBlocks(n => n.filter((_, j) => j !== i)); setNotesSaved(false)
+  }
+  function moveNote(i: number, dir: number) {
+    setNoteBlocks(n => {
+      const j = i + dir
+      if (j < 0 || j >= n.length) return n
+      const copy = [...n];[copy[i], copy[j]] = [copy[j], copy[i]]; return copy
+    }); setNotesSaved(false)
+  }
+  async function saveNotes() {
+    if (!party || savingNotes) return
+    setSavingNotes(true); setNotesSaved(false)
+    const cleaned = noteBlocks
+      .filter(n => (n.text ?? '').trim() || (n.title ?? '').trim())
+      .map(n => ({
+        icon: (n.icon ?? '').trim() || undefined,
+        title: (n.title ?? '').trim() || undefined,
+        text: (n.text ?? '').trim(),
+        link: (n.link ?? '').trim() || undefined,
+        button_label: (n.button_label ?? '').trim() || undefined,
+      }))
+    const { error } = await supabase.from('parties').update({ event_notes: cleaned }).eq('id', partyId)
+    if (!error) {
+      setParty(p => p ? { ...p, event_notes: cleaned } : p)
+      setNotesSaved(true)
+      setTimeout(() => setNotesSaved(false), 2500)
+    }
+    setSavingNotes(false)
   }
 
   function copyLink(guest: Guest) {
@@ -370,6 +413,63 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   {copyError}
                 </p>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Captain's Notes editor */}
+        <div className="mb-4">
+          <button
+            onClick={() => setShowNotesEditor(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <span>📝 Captain's Notes ({noteBlocks.length})</span>
+            <span style={{ opacity: 0.5 }}>{showNotesEditor ? '▲' : '▼'}</span>
+          </button>
+
+          {showNotesEditor && (
+            <div className="rounded-2xl p-4 mt-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p className="text-xs mb-4" style={{ color: 'rgba(253,246,227,0.3)' }}>
+                Little reminders guests see on the final screen — waiver, what to bring, dress code. A note with a link shows as a button.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                {noteBlocks.map((n, i) => (
+                  <div key={i} className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold" style={{ color: 'rgba(201,168,76,0.7)' }}>Note {i + 1}</span>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => moveNote(i, -1)} disabled={i === 0} className="w-7 h-7 rounded-lg text-xs disabled:opacity-25" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--cream)' }}>↑</button>
+                        <button onClick={() => moveNote(i, 1)} disabled={i === noteBlocks.length - 1} className="w-7 h-7 rounded-lg text-xs disabled:opacity-25" style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--cream)' }}>↓</button>
+                        <button onClick={() => removeNoteBlock(i)} className="w-7 h-7 rounded-lg text-xs" style={{ background: 'rgba(196,98,45,0.18)', color: '#f0a07a' }}>×</button>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mb-2">
+                      <input value={n.icon ?? ''} onChange={e => updateNote(i, 'icon', e.target.value)} placeholder="🚤" className="w-12 px-2 py-2 rounded-lg text-center text-sm outline-none" style={inputStyle} />
+                      <input value={n.title ?? ''} onChange={e => updateNote(i, 'title', e.target.value)} placeholder="Title (e.g. Please sign the waiver)" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
+                    </div>
+                    <textarea value={n.text} onChange={e => updateNote(i, 'text', e.target.value)} rows={2} placeholder="Short description" className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none mb-2" style={inputStyle} />
+                    <div className="flex gap-2">
+                      <input value={n.link ?? ''} onChange={e => updateNote(i, 'link', e.target.value)} placeholder="https://link (optional)" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
+                      <input value={n.button_label ?? ''} onChange={e => updateNote(i, 'button_label', e.target.value)} placeholder="Button text" className="w-28 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={addNote} className="w-full py-2.5 mt-3 rounded-xl text-xs font-semibold" style={{ color: 'rgba(201,168,76,0.7)', background: 'rgba(201,168,76,0.06)', border: '1px dashed rgba(201,168,76,0.25)' }}>
+                + Add a note
+              </button>
+
+              <button
+                onClick={saveNotes}
+                disabled={savingNotes}
+                className="w-full py-3 mt-3 rounded-xl font-semibold text-sm active:scale-95 transition-all disabled:opacity-50"
+                style={notesSaved ? { background: 'rgba(107,127,94,0.25)', color: '#a8c99a', border: '1px solid rgba(107,127,94,0.4)' } : { background: 'var(--gold)', color: 'var(--navy)' }}
+              >
+                {savingNotes ? 'Saving…' : notesSaved ? '✓ Saved — guests see it now' : "Save Captain's Notes"}
+              </button>
             </div>
           )}
         </div>
