@@ -45,6 +45,8 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
   const [bdayUploading, setBdayUploading] = useState(false)
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!localStorage.getItem('host_auth')) { router.replace('/host'); return }
@@ -152,6 +154,17 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   async function approveGuest(id: string) {
     await supabase.from('guests').update({ mission_status: 'approved' }).eq('id', id)
     setGuests(g => g.map(x => x.id === id ? { ...x, mission_status: 'approved' } : x))
+  }
+
+  async function removeGuest(id: string) {
+    if (removingId) return
+    setRemovingId(id)
+    const { error } = await supabase.from('guests').delete().eq('id', id)
+    if (!error) {
+      setGuests(g => g.filter(x => x.id !== id))
+      setConfirmRemoveId(null)
+    }
+    setRemovingId(null)
   }
 
   async function toggleReveal(field: 'reveal_titles' | 'reveal_missions') {
@@ -314,7 +327,38 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                     Approve
                   </button>
                 )}
+                <button
+                  onClick={() => setConfirmRemoveId(guest.id)}
+                  aria-label={`Remove ${guest.name}`}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                  style={{ background: 'rgba(196,98,45,0.12)', color: 'rgba(240,160,122,0.9)', border: '1px solid rgba(196,98,45,0.25)' }}
+                >
+                  Remove
+                </button>
               </div>
+
+              {confirmRemoveId === guest.id && (
+                <div className="flex items-center gap-2 mt-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(196,98,45,0.14)', border: '1px solid rgba(196,98,45,0.35)' }}>
+                  <span className="text-xs flex-1" style={{ color: '#f0a07a' }}>
+                    Remove <span className="font-semibold">{guest.name || 'this guest'}</span>? This can't be undone.
+                  </span>
+                  <button
+                    onClick={() => removeGuest(guest.id)}
+                    disabled={removingId === guest.id}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
+                    style={{ background: 'var(--terracotta)', color: 'var(--cream)' }}
+                  >
+                    {removingId === guest.id ? 'Removing…' : 'Yes, remove'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmRemoveId(null)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(253,246,227,0.6)' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
 
               {guest.submission_url && (
                 <img src={guest.submission_url} alt="" className="w-full rounded-xl mt-3 object-cover" style={{ maxHeight: 140 }} />

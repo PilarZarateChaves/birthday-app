@@ -105,6 +105,80 @@ function MissionCard({ level, badge, accent, tint, text, delay }: {
 }
 
 // ─────────────────────────────────────────────────────────
+// Live countdown hero — big days / hours / minutes
+// ─────────────────────────────────────────────────────────
+function eventTargetMs(dateStr: string, timeStr: string | null): number {
+  let h = 15, m = 0
+  const match = (timeStr || '').trim().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i)
+  if (match) {
+    h = parseInt(match[1], 10)
+    m = match[2] ? parseInt(match[2], 10) : 0
+    const ap = match[3]?.toLowerCase()
+    if (ap === 'pm' && h < 12) h += 12
+    if (ap === 'am' && h === 12) h = 0
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return new Date(`${dateStr}T${pad(h)}:${pad(m)}:00`).getTime()
+}
+
+function CountdownHero({ target, subline }: { target: number; subline: string }) {
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => {
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const diff = now == null ? null : Math.max(0, target - now)
+  const days = diff == null ? null : Math.floor(diff / 86400000)
+  const hours = diff == null ? null : Math.floor((diff % 86400000) / 3600000)
+  const mins = diff == null ? null : Math.floor((diff % 3600000) / 60000)
+  const sailed = diff != null && diff <= 0
+
+  const headline = days == null ? 'Counting down…'
+    : sailed ? "Today's the day. We set sail!"
+    : `${days} ${days === 1 ? 'sleep' : 'sleeps'} until we set sail`
+
+  const blocks: { v: number | null; label: string }[] = [
+    { v: days, label: 'Days' },
+    { v: hours, label: 'Hours' },
+    { v: mins, label: 'Minutes' },
+  ]
+
+  return (
+    <div className="text-center">
+      <motion.p
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+        className="mb-4" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--coral)' }}>
+        ⛵ {headline}
+      </motion.p>
+
+      {!sailed && (
+        <div className="flex items-stretch justify-center gap-2.5 mb-4">
+          {blocks.map((b, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 14, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+              className="flex-1 rounded-2xl py-4"
+              style={{ background: '#fff', boxShadow: '0 10px 28px rgba(45,58,74,0.12)', maxWidth: 100 }}>
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.7rem', fontWeight: 700, lineHeight: 1, color: 'var(--riviera-ink)' }}>
+                {b.v == null ? '–' : String(b.v).padStart(2, '0')}
+              </p>
+              <p className="mt-1.5" style={{ fontSize: '0.56rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--riviera-ink-soft)' }}>
+                {b.label}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>{subline}</p>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────
 export default function GuestInvite({ params }: { params: Promise<{ guestCode: string }> }) {
@@ -236,6 +310,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     : sleeps === 0 ? "Today's the day. We set sail!"
     : 'The voyage has sailed'
 
+  const targetMs = eventTargetMs(party.party_date, party.event_time)
   const notes = Array.isArray(party.event_notes) ? party.event_notes : []
   const links = Array.isArray(party.event_links) ? party.event_links : []
   const firstName = guest.name.split(' ')[0]
@@ -442,19 +517,18 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
             <motion.div key="allset" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
               className="flex-1 flex flex-col justify-center py-8">
 
-              <div className="text-center mb-7">
-                <p style={{ fontSize: '2.2rem', marginBottom: '0.4rem' }}>✅</p>
-                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.5rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
-                  You're all set, {firstName}.
+              <div className="text-center mb-6">
+                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--leaf)' }}>
+                  ✅ You're all set, {firstName}
                 </p>
-                <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>
-                  Remember your missions and enjoy the party. See you on the water 🌊
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--riviera-ink)' }}>
+                  Your missions are accepted. Now the countdown begins.
                 </p>
               </div>
 
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mx-auto mb-5"
-                style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 16px rgba(255,122,89,0.18)', fontSize: '0.8rem', fontWeight: 700 }}>
-                ⛵ {countdownText}
+              {/* Countdown — the hero of the final screen */}
+              <div className="mb-8">
+                <CountdownHero target={targetMs} subline="The crew is assembling. See you on the water 🌊" />
               </div>
 
               {/* Departure details — the practical info lives here */}
