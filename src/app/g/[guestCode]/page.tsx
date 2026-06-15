@@ -413,19 +413,19 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
               </motion.p>
 
               {/* Birthday person photo — the emotional anchor */}
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}
-                className="relative mx-auto mb-6" style={{ width: 200 }}>
+              <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}
+                className="relative mx-auto mb-6" style={{ width: 264 }}>
 
                 {/* sun-reflection sparkles */}
-                {[{ t: -7, l: 24, s: 7, d: '0s' }, { t: 12, l: -9, s: 5, d: '1.1s' }, { t: -10, l: 152, s: 6, d: '0.5s' }, { t: 150, l: 194, s: 5, d: '1.7s' }].map((sp, i) => (
+                {[{ t: -8, l: 32, s: 7, d: '0s' }, { t: 16, l: -10, s: 5, d: '1.1s' }, { t: -10, l: 214, s: 6, d: '0.5s' }, { t: 262, l: 252, s: 5, d: '1.7s' }].map((sp, i) => (
                   <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.6) 55%, transparent 100%)', animation: `twinkle 3.4s ease-in-out ${sp.d} infinite`, zIndex: 4 }} />
                 ))}
 
-                <div className="rounded-[2rem] overflow-hidden mx-auto relative" style={{ width: 200, height: 230, border: '5px solid #fff', boxShadow: party.birthday_person_photo ? '0 16px 44px rgba(45,58,74,0.22)' : '0 16px 44px rgba(255,122,89,0.3)' }}>
+                <div className="rounded-[2rem] overflow-hidden mx-auto relative" style={{ width: 264, height: 296, border: '6px solid #fff', boxShadow: party.birthday_person_photo ? '0 18px 48px rgba(45,58,74,0.24)' : '0 18px 48px rgba(255,122,89,0.3)' }}>
                   {party.birthday_person_photo ? (
-                    <img src={party.birthday_person_photo} alt={bdayName} className="w-full h-full object-cover" />
+                    <img src={party.birthday_person_photo} alt={bdayName} className="w-full h-full object-cover" decoding="async" loading="eager" draggable={false} style={{ display: 'block' }} />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '5rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
                       {bdayName[0]}
                     </div>
                   )}
