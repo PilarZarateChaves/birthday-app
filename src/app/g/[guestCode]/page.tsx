@@ -475,19 +475,31 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
             <motion.div key="role" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
               className="flex-1 flex flex-col justify-center py-6 text-center">
 
-              {/* Guest photo — squared, matching the birthday portrait */}
+              {/* Guest photo — squared, matching the birthday portrait, same marina animation */}
               <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.05, type: 'spring', stiffness: 180 }}
-                className="relative mx-auto mb-4" style={{ width: 160 }}>
+                className="relative mx-auto mb-4" style={{ width: 232 }}>
+
+                {/* sun-reflection sparkles */}
+                {[
+                  { top: -8 as number | undefined, bottom: undefined as number | undefined, left: '12%', s: 7, d: '0s' },
+                  { top: 24 as number | undefined, bottom: undefined as number | undefined, left: '-4%', s: 5, d: '1.1s' },
+                  { top: -10 as number | undefined, bottom: undefined as number | undefined, left: '86%', s: 6, d: '0.5s' },
+                ].map((sp, i) => (
+                  <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.top, bottom: sp.bottom, left: sp.left, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.6) 55%, transparent 100%)', animation: `twinkle 3.4s ease-in-out ${sp.d} infinite`, zIndex: 4 }} />
+                ))}
+
                 {guest.photo ? (
-                  <div className="w-full rounded-[1.75rem] overflow-hidden" style={{ border: '5px solid #fff', boxShadow: '0 14px 36px rgba(45,58,74,0.24)' }}>
+                  <div className="w-full rounded-[1.75rem] overflow-hidden relative" style={{ border: '6px solid #fff', boxShadow: '0 16px 42px rgba(45,58,74,0.26)' }}>
                     <img src={guest.photo} alt={firstName} className="w-full" decoding="async" loading="eager" draggable={false} style={{ display: 'block', height: 'auto' }} />
+                    <PhotoWaves />
                   </div>
                 ) : (
-                  <div className="w-full rounded-[1.75rem] flex items-center justify-center" style={{ aspectRatio: '9 / 10', background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '5px solid #fff', color: '#fff', fontSize: '3.4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700, boxShadow: '0 14px 36px rgba(255,122,89,0.3)' }}>
+                  <div className="w-full rounded-[1.75rem] flex items-center justify-center relative overflow-hidden" style={{ aspectRatio: '9 / 10', background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '6px solid #fff', color: '#fff', fontSize: '4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700, boxShadow: '0 16px 42px rgba(255,122,89,0.3)' }}>
                     {firstName[0]}
+                    <PhotoWaves />
                   </div>
                 )}
-                <span style={{ position: 'absolute', bottom: -6, right: -6, fontSize: '1.8rem', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.15))' }}>🎉</span>
+                <span style={{ position: 'absolute', bottom: -8, right: -8, fontSize: '1.9rem', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.15))', zIndex: 5 }}>🎉</span>
               </motion.div>
 
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
