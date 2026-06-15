@@ -413,19 +413,24 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
               </motion.p>
 
               {/* Birthday person photo — the emotional anchor */}
-              <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}
-                className="relative mx-auto mb-6" style={{ width: 264 }}>
+              <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}
+                className="relative mx-auto mb-6" style={{ width: '100%', maxWidth: 360 }}>
 
                 {/* sun-reflection sparkles */}
-                {[{ t: -8, l: 32, s: 7, d: '0s' }, { t: 16, l: -10, s: 5, d: '1.1s' }, { t: -10, l: 214, s: 6, d: '0.5s' }, { t: 262, l: 252, s: 5, d: '1.7s' }].map((sp, i) => (
-                  <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.6) 55%, transparent 100%)', animation: `twinkle 3.4s ease-in-out ${sp.d} infinite`, zIndex: 4 }} />
+                {[
+                  { top: -8 as number | undefined, bottom: undefined as number | undefined, left: '14%', s: 8, d: '0s' },
+                  { top: 22 as number | undefined, bottom: undefined as number | undefined, left: '-3%', s: 6, d: '1.1s' },
+                  { top: -10 as number | undefined, bottom: undefined as number | undefined, left: '84%', s: 7, d: '0.5s' },
+                  { top: undefined as number | undefined, bottom: -7 as number | undefined, left: '88%', s: 6, d: '1.7s' },
+                ].map((sp, i) => (
+                  <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.top, bottom: sp.bottom, left: sp.left, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.6) 55%, transparent 100%)', animation: `twinkle 3.4s ease-in-out ${sp.d} infinite`, zIndex: 4 }} />
                 ))}
 
-                <div className="rounded-[2rem] overflow-hidden mx-auto relative" style={{ width: 264, height: 296, border: '6px solid #fff', boxShadow: party.birthday_person_photo ? '0 18px 48px rgba(45,58,74,0.24)' : '0 18px 48px rgba(255,122,89,0.3)' }}>
+                <div className="rounded-[2rem] overflow-hidden mx-auto relative" style={{ width: '100%', aspectRatio: '9 / 10', border: '7px solid #fff', boxShadow: party.birthday_person_photo ? '0 22px 54px rgba(45,58,74,0.26)' : '0 22px 54px rgba(255,122,89,0.32)' }}>
                   {party.birthday_person_photo ? (
                     <img src={party.birthday_person_photo} alt={bdayName} className="w-full h-full object-cover" decoding="async" loading="eager" draggable={false} style={{ display: 'block' }} />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '5rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '6rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
                       {bdayName[0]}
                     </div>
                   )}
