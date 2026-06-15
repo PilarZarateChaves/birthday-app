@@ -392,7 +392,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
       <div className="fixed pointer-events-none" style={{ bottom: '-14%', left: '-10%', width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(95,182,230,0.32) 0%, transparent 70%)', filter: 'blur(26px)' }} />
       <div className="fixed pointer-events-none" style={{ bottom: '6%', right: '-16%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(247,168,196,0.34) 0%, transparent 70%)', filter: 'blur(22px)' }} />
 
-      {step === 'invitation' && <MarinaBackdrop />}
+      {(step === 'invitation' || step === 'role') && <MarinaBackdrop />}
 
       {showConfetti && <Confetti />}
 
@@ -475,12 +475,24 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
             <motion.div key="role" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
               className="flex-1 flex flex-col justify-center py-6 text-center">
 
-              <motion.p initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.05, type: 'spring', stiffness: 200 }}
-                style={{ fontSize: '2.4rem', marginBottom: '0.5rem' }}>🎉</motion.p>
+              {/* Guest photo */}
+              <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.05, type: 'spring', stiffness: 180 }}
+                className="relative mx-auto mb-4" style={{ width: 116, height: 116 }}>
+                {guest.photo ? (
+                  <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '4px solid #fff', boxShadow: '0 12px 32px rgba(45,58,74,0.22)' }}>
+                    <img src={guest.photo} alt={firstName} className="w-full h-full object-cover" decoding="async" draggable={false} style={{ display: 'block' }} />
+                  </div>
+                ) : (
+                  <div className="w-full h-full rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '4px solid #fff', color: '#fff', fontSize: '2.6rem', fontFamily: "'Playfair Display', serif", fontWeight: 700, boxShadow: '0 12px 32px rgba(255,122,89,0.3)' }}>
+                    {firstName[0]}
+                  </div>
+                )}
+                <span style={{ position: 'absolute', bottom: -2, right: -2, fontSize: '1.7rem', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.15))' }}>🎉</span>
+              </motion.div>
 
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
                 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '1.4rem' }}>
-                You're officially aboard!
+                You're officially aboard, {firstName}!
               </motion.p>
 
               {/* Countdown */}
