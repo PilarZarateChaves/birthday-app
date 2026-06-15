@@ -475,19 +475,19 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
             <motion.div key="role" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
               className="flex-1 flex flex-col justify-center py-6 text-center">
 
-              {/* Guest photo */}
+              {/* Guest photo — squared, matching the birthday portrait */}
               <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.05, type: 'spring', stiffness: 180 }}
-                className="relative mx-auto mb-4" style={{ width: 116, height: 116 }}>
+                className="relative mx-auto mb-4" style={{ width: 160 }}>
                 {guest.photo ? (
-                  <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '4px solid #fff', boxShadow: '0 12px 32px rgba(45,58,74,0.22)' }}>
-                    <img src={guest.photo} alt={firstName} className="w-full h-full object-cover" decoding="async" draggable={false} style={{ display: 'block' }} />
+                  <div className="w-full rounded-[1.75rem] overflow-hidden" style={{ aspectRatio: '9 / 10', border: '5px solid #fff', boxShadow: '0 14px 36px rgba(45,58,74,0.24)' }}>
+                    <img src={guest.photo} alt={firstName} className="w-full h-full object-cover" decoding="async" loading="eager" draggable={false} style={{ display: 'block' }} />
                   </div>
                 ) : (
-                  <div className="w-full h-full rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '4px solid #fff', color: '#fff', fontSize: '2.6rem', fontFamily: "'Playfair Display', serif", fontWeight: 700, boxShadow: '0 12px 32px rgba(255,122,89,0.3)' }}>
+                  <div className="w-full rounded-[1.75rem] flex items-center justify-center" style={{ aspectRatio: '9 / 10', background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '5px solid #fff', color: '#fff', fontSize: '3.4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700, boxShadow: '0 14px 36px rgba(255,122,89,0.3)' }}>
                     {firstName[0]}
                   </div>
                 )}
-                <span style={{ position: 'absolute', bottom: -2, right: -2, fontSize: '1.7rem', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.15))' }}>🎉</span>
+                <span style={{ position: 'absolute', bottom: -6, right: -6, fontSize: '1.8rem', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.15))' }}>🎉</span>
               </motion.div>
 
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
