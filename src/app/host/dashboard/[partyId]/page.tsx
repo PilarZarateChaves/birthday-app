@@ -40,6 +40,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     mission_legendary: '',
   })
   const [selectedTemplate, setSelectedTemplate] = useState(-1)
+  const [editingGuestId, setEditingGuestId] = useState<string | null>(null)
   const [addingGuest, setAddingGuest] = useState(false)
   const [addError, setAddError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -47,6 +48,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [bdayUploading, setBdayUploading] = useState(false)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [showCopyEditor, setShowCopyEditor] = useState(false)
+  const [headlineDraft, setHeadlineDraft] = useState('')
+  const [storyDraft, setStoryDraft] = useState('')
+  const [savingCopy, setSavingCopy] = useState(false)
+  const [copySaved, setCopySaved] = useState(false)
+  const [copyError, setCopyError] = useState('')
 
   useEffect(() => {
     if (!localStorage.getItem('host_auth')) { router.replace('/host'); return }
@@ -59,8 +66,40 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
       supabase.from('guests').select('*').eq('party_id', partyId).order('created_at'),
     ])
     setParty(p)
+    if (p) {
+      setHeadlineDraft(p.invite_headline ?? `{name}, ${p.birthday_person_name} is throwing a boat day 🚢`)
+      setStoryDraft(p.party_story ?? '')
+    }
     setGuests((g ?? []).filter((x: Guest) => x.name))
     setLoading(false)
+  }
+
+  async function saveCopy() {
+    if (!party || savingCopy) return
+    setSavingCopy(true)
+    setCopySaved(false)
+    setCopyError('')
+    const headline = headlineDraft.trim() || null
+    const story = storyDraft.trim() || null
+
+    const { error } = await supabase.from('parties').update({ invite_headline: headline, party_story: story }).eq('id', partyId)
+    if (!error) {
+      setParty(p => p ? { ...p, invite_headline: headline, party_story: story } : p)
+      setCopySaved(true)
+      setTimeout(() => setCopySaved(false), 2500)
+      setSavingCopy(false)
+      return
+    }
+
+    // Headline column may not exist yet — still save the story so editing works today.
+    const retry = await supabase.from('parties').update({ party_story: story }).eq('id', partyId)
+    if (!retry.error) {
+      setParty(p => p ? { ...p, party_story: story } : p)
+      setCopyError('Story saved. To edit the headline too, run the one-line SQL (alter table parties add column invite_headline text) then save again.')
+    } else {
+      setCopyError(retry.error.message)
+    }
+    setSavingCopy(false)
   }
 
   function copyLink(guest: Guest) {
@@ -83,6 +122,34 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     setSelectedTemplate(idx)
   }
 
+  function startEditGuest(guest: Guest) {
+    setEditingGuestId(guest.id)
+    setNewGuest({
+      name: guest.name ?? '',
+      role_name: guest.role_name ?? '',
+      role_description: guest.role_description ?? '',
+      mission_easy: guest.mission_easy ?? '',
+      mission_medium: guest.mission_medium ?? '',
+      mission_legendary: guest.mission_legendary ?? '',
+    })
+    setSelectedTemplate(-1)
+    setPhotoFile(null)
+    setPhotoPreview(guest.photo ?? '')
+    setAddError('')
+    setConfirmRemoveId(null)
+    setShowAddGuest(true)
+  }
+
+  function closeDrawer() {
+    setShowAddGuest(false)
+    setEditingGuestId(null)
+    setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' })
+    setPhotoFile(null)
+    setPhotoPreview('')
+    setSelectedTemplate(-1)
+    setAddError('')
+  }
+
   async function handleAddGuest() {
     if (!newGuest.name.trim() || addingGuest) return
     setAddingGuest(true)
@@ -97,12 +164,33 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
           .from('party-media')
           .upload(path, photoFile, { upsert: true })
         if (uploadErr) {
-          // Photo is optional — don't block adding the guest, just note it.
+          // Photo is optional — don't block, just note it.
           console.warn('Photo upload failed:', uploadErr.message)
         } else {
           const { data } = supabase.storage.from('party-media').getPublicUrl(path)
           photoUrl = data.publicUrl
         }
+      }
+
+      // ── EDIT existing guest ──
+      if (editingGuestId) {
+        const patch: Record<string, unknown> = {
+          name: newGuest.name.trim(),
+          role_name: newGuest.role_name.trim() || null,
+          role_description: newGuest.role_description.trim() || null,
+          mission_easy: newGuest.mission_easy.trim() || null,
+          mission_medium: newGuest.mission_medium.trim() || null,
+          mission_legendary: newGuest.mission_legendary.trim() || null,
+        }
+        if (photoUrl) patch.photo = photoUrl
+        const { error } = await supabase.from('guests').update(patch).eq('id', editingGuestId)
+        if (error) {
+          setAddError(error.message || 'Could not save changes. Please try again.')
+          return
+        }
+        setGuests(g => g.map(x => x.id === editingGuestId ? { ...x, ...patch } as Guest : x))
+        closeDrawer()
+        return
       }
 
       const code = genCode()
@@ -225,9 +313,66 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
             </p>
           </div>
         </div>
-        <p className="text-sm mb-6" style={{ color: 'rgba(253,246,227,0.35)' }}>
+        <p className="text-sm mb-4" style={{ color: 'rgba(253,246,227,0.35)' }}>
           {party?.party_date} · {party?.event_time} · {guests.length} guests
         </p>
+
+        {/* Edit invitation copy */}
+        <div className="mb-4">
+          <button
+            onClick={() => setShowCopyEditor(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <span>✏️ Edit invitation copy</span>
+            <span style={{ opacity: 0.5 }}>{showCopyEditor ? '▲' : '▼'}</span>
+          </button>
+
+          {showCopyEditor && (
+            <div className="rounded-2xl p-4 mt-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p className="text-xs mb-4" style={{ color: 'rgba(253,246,227,0.3)' }}>
+                This is the headline and story guests see on the first screen. Type <span style={{ color: 'var(--gold)' }}>{'{name}'}</span> anywhere to drop in each guest's first name.
+              </p>
+
+              <label style={labelStyle}>Headline</label>
+              <textarea
+                value={headlineDraft}
+                onChange={e => { setHeadlineDraft(e.target.value); setCopySaved(false) }}
+                rows={2}
+                placeholder="{name}, Isaac is throwing a boat day 🚢"
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none mb-4"
+                style={inputStyle}
+              />
+
+              <label style={labelStyle}>Invitation story</label>
+              <textarea
+                value={storyDraft}
+                onChange={e => { setStoryDraft(e.target.value); setCopySaved(false) }}
+                rows={5}
+                placeholder="Isaac is gathering favorite people for an afternoon on the water…"
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none mb-4"
+                style={inputStyle}
+              />
+
+              <button
+                onClick={saveCopy}
+                disabled={savingCopy}
+                className="w-full py-3 rounded-xl font-semibold text-sm active:scale-95 transition-all disabled:opacity-50"
+                style={copySaved
+                  ? { background: 'rgba(107,127,94,0.25)', color: '#a8c99a', border: '1px solid rgba(107,127,94,0.4)' }
+                  : { background: 'var(--gold)', color: 'var(--navy)' }}
+              >
+                {savingCopy ? 'Saving…' : copySaved ? '✓ Saved — guests see it now' : 'Save invitation copy'}
+              </button>
+
+              {copyError && (
+                <p className="text-xs mt-3 px-3 py-2.5 rounded-xl leading-relaxed" style={{ background: 'rgba(196,98,45,0.14)', color: '#f0a07a', border: '1px solid rgba(196,98,45,0.3)' }}>
+                  {copyError}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Build anticipation — the drip */}
         {party && (
@@ -328,6 +473,14 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   </button>
                 )}
                 <button
+                  onClick={() => startEditGuest(guest)}
+                  aria-label={`Edit ${guest.name}`}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                  style={{ background: 'rgba(201,168,76,0.15)', color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.25)' }}
+                >
+                  Edit
+                </button>
+                <button
                   onClick={() => setConfirmRemoveId(guest.id)}
                   aria-label={`Remove ${guest.name}`}
                   className="px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
@@ -383,7 +536,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
         {/* Add guest button */}
         <button
-          onClick={() => setShowAddGuest(true)}
+          onClick={() => { setEditingGuestId(null); setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' }); setPhotoFile(null); setPhotoPreview(''); setSelectedTemplate(-1); setAddError(''); setShowAddGuest(true) }}
           className="w-full py-4 rounded-2xl text-sm font-semibold tracking-widest uppercase active:scale-95 transition-all mb-6"
           style={{ background: 'var(--gold)', color: 'var(--navy)' }}
         >
@@ -408,7 +561,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-40"
               style={{ background: 'rgba(0,0,0,0.6)' }}
-              onClick={() => setShowAddGuest(false)}
+              onClick={closeDrawer}
             />
             <motion.div
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
@@ -417,7 +570,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
               style={{ background: '#1a2d4a', maxHeight: '90vh' }}
             >
               <div className="w-10 h-1 rounded-full mx-auto mb-6" style={{ background: 'rgba(255,255,255,0.15)' }} />
-              <h2 className="text-lg font-bold mb-5" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>Add Guest</h2>
+              <h2 className="text-lg font-bold mb-5" style={{ color: 'var(--cream)', fontFamily: "'Playfair Display', serif" }}>{editingGuestId ? 'Edit Guest' : 'Add Guest'}</h2>
 
               {/* Photo */}
               <div className="flex items-center gap-4 mb-5">
@@ -491,7 +644,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                 className="w-full py-4 rounded-2xl font-semibold text-sm tracking-widest uppercase active:scale-95 transition-all disabled:opacity-40"
                 style={{ background: 'var(--gold)', color: 'var(--navy)' }}
               >
-                {addingGuest ? 'Adding…' : 'Add to the Crew'}
+                {addingGuest ? (editingGuestId ? 'Saving…' : 'Adding…') : (editingGuestId ? 'Save changes' : 'Add to the Crew')}
               </button>
             </motion.div>
           </>

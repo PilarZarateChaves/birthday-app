@@ -49,6 +49,55 @@ function Confetti() {
 }
 
 // ─────────────────────────────────────────────────────────
+// Marina ambience — drifting sailboats far in the background
+// ─────────────────────────────────────────────────────────
+function Sailboat({ tint, scale = 1 }: { tint: string; scale?: number }) {
+  return (
+    <svg width={46 * scale} height={42 * scale} viewBox="0 0 46 42" fill="none" aria-hidden>
+      <path d="M23 5V25" stroke={tint} strokeWidth="1" strokeLinecap="round" opacity="0.9" />
+      <path d="M23.5 7C30 11 33.5 17 34.5 24H23.5V7Z" fill={tint} opacity="0.85" />
+      <path d="M22.5 9.5C16.5 13 14 17.5 13 24H22.5V9.5Z" fill={tint} opacity="0.55" />
+      <path d="M8 25.5H38C36 31.5 31.5 34 23 34C14.5 34 10 31.5 8 25.5Z" fill={tint} opacity="0.9" />
+    </svg>
+  )
+}
+
+function MarinaBackdrop() {
+  const boats = [
+    { top: '17%', tint: 'rgba(95,182,230,0.32)', scale: 0.8, dur: 48, delay: '0s', bob: 3.6 },
+    { top: '44%', tint: 'rgba(255,122,89,0.22)', scale: 1.05, dur: 64, delay: '-26s', bob: 4.4 },
+    { top: '70%', tint: 'rgba(45,58,74,0.13)', scale: 0.66, dur: 56, delay: '-40s', bob: 4 },
+  ]
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+      {boats.map((b, i) => (
+        <div key={i} className="marina-anim absolute" style={{ top: b.top, left: 0, animation: `sailDrift ${b.dur}s linear ${b.delay} infinite` }}>
+          <div className="marina-anim" style={{ animation: `gentleBob ${b.bob}s ease-in-out infinite` }}>
+            <Sailboat tint={b.tint} scale={b.scale} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Tiny waves lapping the bottom of the photo frame
+function PhotoWaves() {
+  return (
+    <div className="absolute left-0 right-0 bottom-0" style={{ height: 28, overflow: 'hidden' }}>
+      <svg className="marina-anim" viewBox="0 0 120 28" preserveAspectRatio="none"
+        style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: 28, animation: 'waveSlide 9s linear infinite', opacity: 0.5 }}>
+        <path d="M0 16 Q7.5 9 15 16 T30 16 T45 16 T60 16 T75 16 T90 16 T105 16 T120 16 V28 H0 Z" fill="rgba(199,232,247,0.95)" />
+      </svg>
+      <svg className="marina-anim" viewBox="0 0 120 28" preserveAspectRatio="none"
+        style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: 28, animation: 'waveSlide 6s linear infinite', opacity: 0.75 }}>
+        <path d="M0 19 Q7.5 13 15 19 T30 19 T45 19 T60 19 T75 19 T90 19 T105 19 T120 19 V28 H0 Z" fill="rgba(255,255,255,0.9)" />
+      </svg>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────
 // Step progress dots (1-2-3 wizard)
 // ─────────────────────────────────────────────────────────
 const WIZARD_STEPS: Step[] = ['invitation', 'role', 'missions']
@@ -315,6 +364,9 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const links = Array.isArray(party.event_links) ? party.event_links : []
   const firstName = guest.name.split(' ')[0]
   const bdayName = party.birthday_person_name
+  const fill = (s: string) => s.replace(/\{name\}/gi, firstName)
+  const inviteHeadline = fill(party.invite_headline || `{name}, ${bdayName} is throwing a boat day 🚢`)
+  const storyText = fill(party.party_story || `${bdayName} is gathering favorite people for an afternoon on the water. There will be snacks, sunshine, birthday chaos, and at least one group photo we'll pretend was effortless. We'd love you on the crew.`)
   const titlesLive = party.reveal_titles ?? true
   const missionsLive = party.reveal_missions ?? true
   const missionList = [
@@ -340,6 +392,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
       <div className="fixed pointer-events-none" style={{ bottom: '-14%', left: '-10%', width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(95,182,230,0.32) 0%, transparent 70%)', filter: 'blur(26px)' }} />
       <div className="fixed pointer-events-none" style={{ bottom: '6%', right: '-16%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(247,168,196,0.34) 0%, transparent 70%)', filter: 'blur(22px)' }} />
 
+      {step === 'invitation' && <MarinaBackdrop />}
+
       {showConfetti && <Confetti />}
 
       <div className="max-w-sm mx-auto px-5 relative z-10 min-h-screen flex flex-col">
@@ -360,26 +414,33 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
               {/* Birthday person photo — the emotional anchor */}
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}
-                className="mx-auto mb-6">
-                {party.birthday_person_photo ? (
-                  <div className="rounded-[2rem] overflow-hidden mx-auto" style={{ width: 200, height: 230, border: '5px solid #fff', boxShadow: '0 16px 44px rgba(45,58,74,0.22)' }}>
+                className="relative mx-auto mb-6" style={{ width: 200 }}>
+
+                {/* sun-reflection sparkles */}
+                {[{ t: -7, l: 24, s: 7, d: '0s' }, { t: 12, l: -9, s: 5, d: '1.1s' }, { t: -10, l: 152, s: 6, d: '0.5s' }, { t: 150, l: 194, s: 5, d: '1.7s' }].map((sp, i) => (
+                  <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.6) 55%, transparent 100%)', animation: `twinkle 3.4s ease-in-out ${sp.d} infinite`, zIndex: 4 }} />
+                ))}
+
+                <div className="rounded-[2rem] overflow-hidden mx-auto relative" style={{ width: 200, height: 230, border: '5px solid #fff', boxShadow: party.birthday_person_photo ? '0 16px 44px rgba(45,58,74,0.22)' : '0 16px 44px rgba(255,122,89,0.3)' }}>
+                  {party.birthday_person_photo ? (
                     <img src={party.birthday_person_photo} alt={bdayName} className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="rounded-[2rem] mx-auto flex items-center justify-center" style={{ width: 200, height: 230, background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '5px solid #fff', boxShadow: '0 16px 44px rgba(255,122,89,0.3)', color: '#fff', fontSize: '4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
-                    {bdayName[0]}
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
+                      {bdayName[0]}
+                    </div>
+                  )}
+                  <PhotoWaves />
+                </div>
               </motion.div>
 
               <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }}
-                style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.9rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.2, marginBottom: '0.9rem' }}>
-                {firstName}, {bdayName} is throwing a boat day 🚢
+                style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.9rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.2, marginBottom: '0.9rem', whiteSpace: 'pre-wrap' }}>
+                {inviteHeadline}
               </motion.h1>
 
               <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.32 }}
-                className="text-[0.97rem] leading-[1.85] mb-2" style={{ color: 'var(--riviera-ink-soft)' }}>
-                {party.party_story || `${bdayName} is gathering favorite people for an afternoon on the water. There will be snacks, sunshine, birthday chaos, and at least one group photo we'll pretend was effortless. We'd love you on the crew.`}
+                className="text-[0.97rem] leading-[1.85] mb-2" style={{ color: 'var(--riviera-ink-soft)', whiteSpace: 'pre-wrap' }}>
+                {storyText}
               </motion.p>
 
               {crew.length > 0 && (

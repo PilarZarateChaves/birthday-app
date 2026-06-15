@@ -23,6 +23,7 @@ export interface Party {
   birthday_person_photo: string | null
   party_title: string
   party_date: string
+  invite_headline: string | null
   party_story: string | null
   event_time: string | null
   event_location: string | null

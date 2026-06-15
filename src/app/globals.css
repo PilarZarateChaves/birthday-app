@@ -49,3 +49,21 @@ body {
   70% { transform: scale(1.1) rotate(2deg); }
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
+
+/* ── Marina boat-day ambience ── */
+@keyframes sailDrift {
+  from { transform: translateX(-16vw); }
+  to   { transform: translateX(116vw); }
+}
+@keyframes waveSlide {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes gentleBob {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50%      { transform: translateY(-5px) rotate(1.5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marina-anim { animation: none !important; }
+}
