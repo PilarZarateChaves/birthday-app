@@ -426,9 +426,9 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.top, bottom: sp.bottom, left: sp.left, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.6) 55%, transparent 100%)', animation: `twinkle 3.4s ease-in-out ${sp.d} infinite`, zIndex: 4 }} />
                 ))}
 
-                <div className="rounded-[2rem] overflow-hidden mx-auto relative" style={{ width: '100%', aspectRatio: '9 / 10', border: '7px solid #fff', boxShadow: party.birthday_person_photo ? '0 22px 54px rgba(45,58,74,0.26)' : '0 22px 54px rgba(255,122,89,0.32)' }}>
+                <div className="rounded-[2rem] overflow-hidden mx-auto relative" style={{ width: '100%', border: '7px solid #fff', boxShadow: party.birthday_person_photo ? '0 22px 54px rgba(45,58,74,0.26)' : '0 22px 54px rgba(255,122,89,0.32)', ...(party.birthday_person_photo ? {} : { aspectRatio: '9 / 10' }) }}>
                   {party.birthday_person_photo ? (
-                    <img src={party.birthday_person_photo} alt={bdayName} className="w-full h-full object-cover" decoding="async" loading="eager" draggable={false} style={{ display: 'block' }} />
+                    <img src={party.birthday_person_photo} alt={bdayName} className="w-full" decoding="async" loading="eager" draggable={false} style={{ display: 'block', height: 'auto' }} />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '6rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
                       {bdayName[0]}
@@ -479,8 +479,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
               <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, delay: 0.05, type: 'spring', stiffness: 180 }}
                 className="relative mx-auto mb-4" style={{ width: 160 }}>
                 {guest.photo ? (
-                  <div className="w-full rounded-[1.75rem] overflow-hidden" style={{ aspectRatio: '9 / 10', border: '5px solid #fff', boxShadow: '0 14px 36px rgba(45,58,74,0.24)' }}>
-                    <img src={guest.photo} alt={firstName} className="w-full h-full object-cover" decoding="async" loading="eager" draggable={false} style={{ display: 'block' }} />
+                  <div className="w-full rounded-[1.75rem] overflow-hidden" style={{ border: '5px solid #fff', boxShadow: '0 14px 36px rgba(45,58,74,0.24)' }}>
+                    <img src={guest.photo} alt={firstName} className="w-full" decoding="async" loading="eager" draggable={false} style={{ display: 'block', height: 'auto' }} />
                   </div>
                 ) : (
                   <div className="w-full rounded-[1.75rem] flex items-center justify-center" style={{ aspectRatio: '9 / 10', background: 'linear-gradient(135deg, var(--sunny), var(--coral))', border: '5px solid #fff', color: '#fff', fontSize: '3.4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700, boxShadow: '0 14px 36px rgba(255,122,89,0.3)' }}>
