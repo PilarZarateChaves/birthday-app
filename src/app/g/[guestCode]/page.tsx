@@ -856,11 +856,13 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   ))}
                   <div className="relative" style={{ zIndex: 2 }}>
                     <p style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>🔒</p>
-                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.4rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>Missions Locked</p>
-                    <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)', marginBottom: '1rem' }}>
-                      Complete the required boarding item{requiredState.length === 1 ? '' : 's'} above to unlock your assignments.
+                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.4rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>
+                      {missionList.length} Secret Mission{missionList.length === 1 ? '' : 's'} Locked
                     </p>
-                    <p className="text-xs font-bold" style={{ color: 'var(--coral)', marginBottom: '0.5rem' }}>{requiredDone} of {requiredState.length} completed</p>
+                    <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)', marginBottom: '1rem' }}>
+                      There are {missionList.length} fun mission{missionList.length === 1 ? '' : 's'} waiting just for you 🎯 Finish the required boarding item{requiredState.length === 1 ? '' : 's'} above to unlock {missionList.length === 1 ? 'it' : 'them'}.
+                    </p>
+                    <p className="text-xs font-bold" style={{ color: 'var(--coral)', marginBottom: '0.5rem' }}>{requiredDone} of {requiredState.length} required completed</p>
                     <div className="mx-auto rounded-full overflow-hidden" style={{ height: 8, width: '72%', background: 'rgba(45,58,74,0.08)' }}>
                       <motion.div animate={{ width: `${requiredState.length ? (requiredDone / requiredState.length) * 100 : 0}%` }} transition={{ duration: 0.5 }}
                         style={{ height: '100%', background: 'linear-gradient(90deg, var(--sunny), var(--coral))', borderRadius: 99 }} />
