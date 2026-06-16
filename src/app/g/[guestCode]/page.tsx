@@ -416,10 +416,10 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const titlesLive = party.reveal_titles ?? true
   const missionsLive = party.reveal_missions ?? true
   const missionList = [
-    guest.mission_easy && { key: 'easy', level: 'Easy', badge: '🟢', icon: '🌊', reward: 'Warm-up points', accent: 'var(--leaf)', tint: 'var(--leaf-soft)', text: guest.mission_easy },
-    guest.mission_medium && { key: 'medium', level: 'Medium', badge: '🟡', icon: '🥂', reward: 'Crew respect', accent: '#e0a93c', tint: 'var(--sunny-soft)', text: guest.mission_medium },
-    guest.mission_legendary && { key: 'legendary', level: 'Legendary', badge: '🔥', icon: '🏆', reward: 'Eternal glory', accent: 'var(--coral)', tint: 'var(--coral-soft)', text: guest.mission_legendary },
-  ].filter(Boolean) as { key: string; level: string; badge: string; icon: string; reward: string; accent: string; tint: string; text: string }[]
+    guest.mission_easy && { key: 'easy', level: 'Easy', badge: '🟢', icon: '🌊', accent: 'var(--leaf)', tint: 'var(--leaf-soft)', text: guest.mission_easy },
+    guest.mission_medium && { key: 'medium', level: 'Medium', badge: '🟡', icon: '🥂', accent: '#e0a93c', tint: 'var(--sunny-soft)', text: guest.mission_medium },
+    guest.mission_legendary && { key: 'legendary', level: 'Legendary', badge: '🔥', icon: '🏆', accent: 'var(--coral)', tint: 'var(--coral-soft)', text: guest.mission_legendary },
+  ].filter(Boolean) as { key: string; level: string; badge: string; icon: string; accent: string; tint: string; text: string }[]
 
   const stepIn = { opacity: 0, x: 36 }
   const stepAnim = { opacity: 1, x: 0 }
@@ -720,12 +720,9 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                                 </div>
                               </div>
                               <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--riviera-ink)', minHeight: 64 }}>{m.text}</p>
-                              <div className="flex items-center justify-between flex-wrap gap-2">
-                                <span className="text-xs font-semibold" style={{ color: m.accent }}>🎁 {m.reward}</span>
-                                <span className="text-xs font-bold" style={{ color: done ? 'var(--leaf)' : '#c79a3c' }}>
-                                  {done ? '✅ Mission accomplished' : '🟡 In progress'}
-                                </span>
-                              </div>
+                              <span className="text-xs font-bold" style={{ color: done ? 'var(--leaf)' : '#c79a3c' }}>
+                                {done ? '✅ Mission accomplished' : '🟡 In progress'}
+                              </span>
                             </div>
                           </motion.div>
                         </AnimatePresence>

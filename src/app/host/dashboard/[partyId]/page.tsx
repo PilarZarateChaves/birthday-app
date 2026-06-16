@@ -217,13 +217,18 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
       // ── EDIT existing guest ──
       if (editingGuestId) {
+        // Once a guest accepts, their missions are locked — never overwrite them.
+        const target = guests.find(g => g.id === editingGuestId)
+        const locked = !!target?.mission_accepted
         const patch: Record<string, unknown> = {
           name: newGuest.name.trim(),
           role_name: newGuest.role_name.trim() || null,
           role_description: newGuest.role_description.trim() || null,
-          mission_easy: newGuest.mission_easy.trim() || null,
-          mission_medium: newGuest.mission_medium.trim() || null,
-          mission_legendary: newGuest.mission_legendary.trim() || null,
+        }
+        if (!locked) {
+          patch.mission_easy = newGuest.mission_easy.trim() || null
+          patch.mission_medium = newGuest.mission_medium.trim() || null
+          patch.mission_legendary = newGuest.mission_legendary.trim() || null
         }
         if (photoUrl) patch.photo = photoUrl
         const { error } = await supabase.from('guests').update(patch).eq('id', editingGuestId)
@@ -328,6 +333,15 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
   const inputStyle = { background: 'rgba(255,255,255,0.07)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }
   const labelStyle = { color: 'rgba(201,168,76,0.7)', fontSize: '0.65rem', letterSpacing: '0.15em', textTransform: 'uppercase' as const, display: 'block', marginBottom: '0.3rem' }
+
+  const editingGuest = editingGuestId ? guests.find(g => g.id === editingGuestId) : undefined
+  const missionsLocked = !!editingGuest?.mission_accepted
+  const isVideo = (url: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url)
+  const TIERS = [
+    { key: 'easy' as const, field: 'mission_easy' as const, label: '🟢 Easy' },
+    { key: 'medium' as const, field: 'mission_medium' as const, label: '🟡 Medium' },
+    { key: 'legendary' as const, field: 'mission_legendary' as const, label: '🔥 Legendary' },
+  ]
 
   if (loading) return <main className="min-h-screen" style={{ background: '#0f1a30' }} />
 
@@ -613,6 +627,50 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                 </div>
               )}
 
+              {/* Mission progress — live updates from the guest */}
+              {(() => {
+                const mp = (guest.mission_progress && typeof guest.mission_progress === 'object') ? guest.mission_progress : {}
+                const rows = TIERS.filter(t => guest[t.field])
+                if (rows.length === 0) return null
+                const doneCount = rows.filter(t => mp[t.key]?.done).length
+                return (
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p className="text-xs font-semibold mb-2" style={{ color: 'rgba(201,168,76,0.7)' }}>
+                      Missions {doneCount}/{rows.length} done
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {rows.map(t => {
+                        const e = mp[t.key] ?? {}
+                        return (
+                          <div key={t.key}>
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs flex-shrink-0">{e.done ? '✅' : '🟡'}</span>
+                              <p className="text-xs leading-snug" style={{ color: 'rgba(253,246,227,0.6)' }}>
+                                <span style={{ color: 'rgba(253,246,227,0.35)' }}>{t.label.split(' ')[1]}:</span> {guest[t.field]}
+                              </p>
+                            </div>
+                            {e.note && (
+                              <p className="text-xs mt-1 ml-5 px-2.5 py-1.5 rounded-lg leading-relaxed" style={{ background: 'rgba(95,182,230,0.1)', color: 'rgba(253,246,227,0.7)' }}>
+                                ❝ {e.note} ❞
+                              </p>
+                            )}
+                            {Array.isArray(e.media) && e.media.length > 0 && (
+                              <div className="grid grid-cols-4 gap-1.5 mt-1.5 ml-5">
+                                {e.media.map((url, i) => (
+                                  isVideo(url)
+                                    ? <video key={i} src={url} controls className="w-full aspect-square object-cover rounded-lg" />
+                                    : <img key={i} src={url} alt="" className="w-full aspect-square object-cover rounded-lg" />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
               {guest.submission_url && (
                 <img src={guest.submission_url} alt="" className="w-full rounded-xl mt-3 object-cover" style={{ maxHeight: 140 }} />
               )}
@@ -687,6 +745,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
               </div>
 
               {/* Mission templates */}
+              {!missionsLocked && (
               <div className="mb-4">
                 <label style={labelStyle}>Quick assign a role</label>
                 <div className="flex flex-wrap gap-2">
@@ -707,6 +766,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Role fields */}
               <div className="flex flex-col gap-3 mb-5">
@@ -718,17 +778,23 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   <label style={labelStyle}>Role description</label>
                   <textarea value={newGuest.role_description} onChange={e => setNewGuest(g => ({ ...g, role_description: e.target.value }))} rows={2} placeholder="Master of persuasion and questionable truths." className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
                 </div>
+
+                {missionsLocked && (
+                  <div className="px-3 py-2.5 rounded-xl text-xs leading-relaxed" style={{ background: 'rgba(107,127,94,0.15)', color: '#a8c99a', border: '1px solid rgba(107,127,94,0.3)' }}>
+                    🔒 {editingGuest?.name?.split(' ')[0] || 'This guest'} already accepted their missions, so they're locked. Name and role can still be edited.
+                  </div>
+                )}
                 <div>
                   <label style={labelStyle}>🟢 Easy mission</label>
-                  <textarea value={newGuest.mission_easy} onChange={e => setNewGuest(g => ({ ...g, mission_easy: e.target.value }))} rows={2} placeholder="Call Isaac 'Captain' at least once…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+                  <textarea value={newGuest.mission_easy} disabled={missionsLocked} onChange={e => setNewGuest(g => ({ ...g, mission_easy: e.target.value }))} rows={2} placeholder="Call Isaac 'Captain' at least once…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none disabled:opacity-50" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>🟡 Medium mission</label>
-                  <textarea value={newGuest.mission_medium} onChange={e => setNewGuest(g => ({ ...g, mission_medium: e.target.value }))} rows={2} placeholder="Get two people to join a toast…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+                  <textarea value={newGuest.mission_medium} disabled={missionsLocked} onChange={e => setNewGuest(g => ({ ...g, mission_medium: e.target.value }))} rows={2} placeholder="Get two people to join a toast…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none disabled:opacity-50" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>🔥 Legendary mission</label>
-                  <textarea value={newGuest.mission_legendary} onChange={e => setNewGuest(g => ({ ...g, mission_legendary: e.target.value }))} rows={2} placeholder="Help create a group photo that actually looks fun…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+                  <textarea value={newGuest.mission_legendary} disabled={missionsLocked} onChange={e => setNewGuest(g => ({ ...g, mission_legendary: e.target.value }))} rows={2} placeholder="Help create a group photo that actually looks fun…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none disabled:opacity-50" style={inputStyle} />
                 </div>
               </div>
 
