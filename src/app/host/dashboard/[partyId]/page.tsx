@@ -548,7 +548,6 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
             {[
               { field: 'reveal_titles' as const, on: !!party.reveal_titles, label: 'Boat-day titles', hint: 'Guests can see their role' },
-              { field: 'reveal_missions' as const, on: !!party.reveal_missions, label: 'Secret missions', hint: 'Missions unlock after RSVP' },
             ].map(row => (
               <div key={row.field} className="flex items-center justify-between py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <div>

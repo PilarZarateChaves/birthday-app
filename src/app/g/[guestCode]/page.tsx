@@ -447,7 +447,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const inviteHeadline = fill(party.invite_headline || `{name}, ${bdayName} is throwing a boat day 🚢`)
   const storyText = fill(party.party_story || `${bdayName} is gathering favorite people for an afternoon on the water. There will be snacks, sunshine, birthday chaos, and at least one group photo we'll pretend was effortless. We'd love you on the crew.`)
   const titlesLive = party.reveal_titles ?? true
-  const missionsLive = party.reveal_missions ?? true
   const missionList = [
     guest.mission_easy && { key: 'easy', level: 'Easy', badge: '🟢', icon: '🌊', accent: 'var(--leaf)', tint: 'var(--leaf-soft)', text: guest.mission_easy },
     guest.mission_medium && { key: 'medium', level: 'Medium', badge: '🟡', icon: '🥂', accent: '#e0a93c', tint: 'var(--sunny-soft)', text: guest.mission_medium },
@@ -823,16 +822,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 </div>
               )}
 
-              {/* ── LOCKED MISSION AREA → reveal → carousel ── */}
-              {missionList.length > 0 && !missionsRevealed && !missionsLive && (
-                <div className="rounded-3xl px-6 py-8 mb-7 text-center" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.08)', border: '1.5px dashed var(--coral-soft)' }}>
-                  <p style={{ fontSize: '1.9rem', marginBottom: '0.4rem' }}>🤫</p>
-                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>Your missions are sealed</p>
-                  <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>The Captain releases them closer to the day 🍋</p>
-                </div>
-              )}
-
-              {missionList.length > 0 && !missionsRevealed && missionsLive && canReveal && (
+              {/* ── LOCKED MISSION AREA → reveal → carousel (gated by required boarding items) ── */}
+              {missionList.length > 0 && !missionsRevealed && canReveal && (
                 <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }}
                   className="rounded-3xl px-6 py-8 mb-7 text-center relative overflow-hidden"
                   style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', boxShadow: '0 14px 38px rgba(255,122,89,0.38)' }}>
@@ -852,7 +843,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 </motion.div>
               )}
 
-              {missionList.length > 0 && !missionsRevealed && missionsLive && !canReveal && (
+              {missionList.length > 0 && !missionsRevealed && !canReveal && (
                 <motion.div className="rounded-3xl px-6 py-8 mb-7 text-center relative overflow-hidden" style={{ background: '#fff' }}
                   animate={{ boxShadow: ['0 0 0 1px rgba(201,168,76,0.35), 0 0 16px rgba(201,168,76,0.2)', '0 0 0 1.5px rgba(201,168,76,0.85), 0 0 34px rgba(201,168,76,0.5)', '0 0 0 1px rgba(201,168,76,0.35), 0 0 16px rgba(201,168,76,0.2)'] }}
                   transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}>
@@ -879,7 +870,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
               )}
 
               {/* ── MISSIONS: swipeable deck (after reveal) ── */}
-              {missionsRevealed && missionsLive && missionList.length > 0 && (() => {
+              {missionsRevealed && missionList.length > 0 && (() => {
                 const m = missionList[activeIdx]
                 const p = progress[m.key] ?? {}
                 const done = !!p.done
