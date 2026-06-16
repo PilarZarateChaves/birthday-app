@@ -253,6 +253,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [activeMission, setActiveMission] = useState(0)
   const [missionDir, setMissionDir] = useState(1)
   const [evidenceBusy, setEvidenceBusy] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
 
   async function loadCrew(partyId: string) {
     const { data } = await supabase.from('guests').select('name, photo').eq('party_id', partyId).eq('rsvp_status', 'accepted')
@@ -354,29 +356,54 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     if (guest) await supabase.from('guests').update({ mission_progress: next }).eq('id', guest.id)
   }
 
-  function toggleMissionDone(key: string) {
+  function markComplete(key: string) {
     const cur = progress[key] ?? {}
-    persistProgress({ ...progress, [key]: { ...cur, done: !cur.done } })
+    persistProgress({ ...progress, [key]: { ...cur, done: true } })
+    setExpanded(e => ({ ...e, [key]: true }))
   }
 
-  function saveMissionNote(key: string) {
+  function markNotComplete(key: string) {
     const cur = progress[key] ?? {}
-    persistProgress({ ...progress, [key]: { ...cur, note: noteDrafts[key] ?? '' } })
+    persistProgress({ ...progress, [key]: { ...cur, done: false } })
+    setExpanded(e => ({ ...e, [key]: false }))
   }
 
-  async function uploadEvidence(key: string, file: File) {
+  async function saveMemory(key: string) {
+    const cur = progress[key] ?? {}
+    await persistProgress({ ...progress, [key]: { ...cur, note: noteDrafts[key] ?? '' } })
+    setExpanded(e => ({ ...e, [key]: false }))
+    setSavedFlash(f => ({ ...f, [key]: true }))
+    setTimeout(() => setSavedFlash(f => ({ ...f, [key]: false })), 2400)
+  }
+
+  async function uploadEvidenceFiles(key: string, files: FileList) {
     if (!guest || !party || evidenceBusy) return
     setEvidenceBusy(key)
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-    const path = `evidence/${party.id}/${guest.id}/${key}/${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('party-media').upload(path, file, { upsert: true })
-    if (!error) {
-      const { data } = supabase.storage.from('party-media').getPublicUrl(path)
-      const cur = progress[key] ?? {}
-      const media = [...(cur.media ?? []), data.publicUrl]
-      await persistProgress({ ...progress, [key]: { ...cur, media } })
+    const cur = progress[key] ?? {}
+    const added: string[] = []
+    const list = Array.from(files)
+    for (let i = 0; i < list.length; i++) {
+      const file = list[i]
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+      const path = `evidence/${party.id}/${guest.id}/${key}/${Date.now()}-${i}.${ext}`
+      const { error } = await supabase.storage.from('party-media').upload(path, file, { upsert: true })
+      if (!error) {
+        const { data } = supabase.storage.from('party-media').getPublicUrl(path)
+        added.push(data.publicUrl)
+      }
     }
+    const media = [...(cur.media ?? []), ...added]
+    await persistProgress({ ...progress, [key]: { ...(progress[key] ?? {}), media } })
     setEvidenceBusy(null)
+  }
+
+  async function deleteEvidence(key: string, url: string) {
+    const cur = progress[key] ?? {}
+    const media = (cur.media ?? []).filter(u => u !== url)
+    await persistProgress({ ...progress, [key]: { ...cur, media } })
+    const marker = '/party-media/'
+    const idx = url.indexOf(marker)
+    if (idx >= 0) supabase.storage.from('party-media').remove([url.slice(idx + marker.length)])
   }
 
   function goMission(dir: number, count: number) {
@@ -422,6 +449,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   ].filter(Boolean) as { key: string; level: string; badge: string; icon: string; accent: string; tint: string; text: string }[]
   const missionsDone = missionList.filter(m => !!progress[m.key]?.done).length
   const sailDay = sleeps <= 0  // the birthday itself (or after) — countdown becomes celebration
+  // Missions close 24h after the celebration, to build the newspaper.
+  const missionsClosed = Date.now() > targetMs + 86400000
 
   const stepIn = { opacity: 0, x: 36 }
   const stepAnim = { opacity: 1, x: 0 }
@@ -723,6 +752,11 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 const p = progress[m.key] ?? {}
                 const done = !!p.done
                 const media = p.media ?? []
+                const isOpen = !!expanded[m.key]
+                const flashed = !!savedFlash[m.key]
+                const photoCount = media.filter(u => !isVideo(u)).length
+                const videoCount = media.filter(isVideo).length
+                const hasStory = !!(p.note && p.note.trim())
                 return (
                   <div className="mb-7">
                     <p className="text-center mb-1" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--riviera-ink)' }}>
@@ -755,47 +789,96 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                               </div>
                               <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--riviera-ink)', minHeight: 60 }}>{m.text}</p>
 
-                              {/* completion action — lives inside this mission card */}
+                              {/* completion + memory capture — lives inside this mission card */}
                               <div onPointerDown={e => e.stopPropagation()}>
-                                <button onClick={() => toggleMissionDone(m.key)}
-                                  className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all"
-                                  style={done
-                                    ? { background: 'var(--leaf)', color: '#fff' }
-                                    : { background: '#fff', color: 'var(--leaf)', border: '2px solid var(--leaf)' }}>
-                                  {done ? '✅ Mission Accomplished' : 'Mark this mission accomplished'}
-                                </button>
 
-                                {done && (
-                                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="mt-4">
-                                    <p className="text-sm font-semibold mb-1" style={{ color: 'var(--riviera-ink)' }}>Got proof? We want to see it 😎</p>
-                                    <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Your photos and notes become part of {bdayName}'s birthday newspaper after the boat day.</p>
+                                {/* STATE 1 — not complete */}
+                                {!done && (
+                                  missionsClosed ? (
+                                    <p className="text-center text-xs py-2" style={{ color: 'var(--riviera-ink-soft)' }}>📰 Submissions are closed</p>
+                                  ) : (
+                                    <button onClick={() => markComplete(m.key)}
+                                      className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+                                      style={{ background: 'var(--leaf)', color: '#fff' }}>
+                                      Mark as Complete
+                                    </button>
+                                  )
+                                )}
 
-                                    <textarea
-                                      value={noteDrafts[m.key] ?? ''}
-                                      onChange={e => setNoteDrafts(d => ({ ...d, [m.key]: e.target.value }))}
-                                      onBlur={() => saveMissionNote(m.key)}
-                                      rows={3} placeholder="Tell us what happened…"
-                                      className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none mb-3"
-                                      style={{ background: '#fff', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.12)' }} />
+                                {/* STATE 2 — complete + capturing/editing */}
+                                {done && isOpen && (
+                                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <p className="text-sm font-bold" style={{ color: 'var(--leaf)' }}>✅ Mission Accomplished</p>
+                                      {!missionsClosed && (
+                                        <button onClick={() => markNotComplete(m.key)} className="text-xs underline" style={{ color: 'var(--riviera-ink-soft)' }}>Undo</button>
+                                      )}
+                                    </div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--riviera-ink)' }}>Help us remember this moment.</p>
+                                    <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Photos and your story become part of {bdayName}'s birthday newspaper. Add either, or both.</p>
 
                                     {media.length > 0 && (
                                       <div className="grid grid-cols-3 gap-2 mb-3">
                                         {media.map((url, i) => (
-                                          isVideo(url)
-                                            ? <video key={i} src={url} controls className="w-full aspect-square object-cover rounded-xl" />
-                                            : <img key={i} src={url} alt="" className="w-full aspect-square object-cover rounded-xl" />
+                                          <div key={i} className="relative">
+                                            {isVideo(url)
+                                              ? <video src={url} controls className="w-full aspect-square object-cover rounded-xl" />
+                                              : <img src={url} alt="" className="w-full aspect-square object-cover rounded-xl" />}
+                                            <button onClick={() => deleteEvidence(m.key, url)} aria-label="Delete"
+                                              className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                                              style={{ background: 'var(--coral)', color: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.25)' }}>×</button>
+                                          </div>
                                         ))}
                                       </div>
                                     )}
 
-                                    <label className="block">
+                                    <label className="block mb-3">
                                       <div className="w-full py-3 rounded-2xl font-bold text-sm text-center active:scale-95 transition-all cursor-pointer"
                                         style={{ background: 'var(--sky-soft)', color: 'var(--sky)' }}>
-                                        {evidenceBusy === m.key ? 'Uploading…' : '📷 Upload photo or video'}
+                                        {evidenceBusy === m.key ? 'Uploading…' : '📷 Add Photos or Videos'}
                                       </div>
-                                      <input type="file" accept="image/*,video/*" className="hidden" disabled={!!evidenceBusy}
-                                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadEvidence(m.key, f) }} />
+                                      <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={!!evidenceBusy}
+                                        onChange={e => { if (e.target.files && e.target.files.length) uploadEvidenceFiles(m.key, e.target.files); e.currentTarget.value = '' }} />
                                     </label>
+
+                                    <textarea
+                                      value={noteDrafts[m.key] ?? ''}
+                                      onChange={e => setNoteDrafts(d => ({ ...d, [m.key]: e.target.value }))}
+                                      rows={3} placeholder="✍️ Add your story — what happened?"
+                                      className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none mb-3"
+                                      style={{ background: '#fff', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.12)' }} />
+
+                                    <button onClick={() => saveMemory(m.key)} disabled={evidenceBusy === m.key}
+                                      className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all disabled:opacity-50"
+                                      style={{ background: 'var(--coral)', color: '#fff' }}>
+                                      Save memory
+                                    </button>
+                                  </motion.div>
+                                )}
+
+                                {/* STATE 3 — complete + collapsed summary */}
+                                {done && !isOpen && (
+                                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                    {flashed && (
+                                      <motion.p initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                                        className="text-center text-sm font-bold mb-2" style={{ color: 'var(--leaf)' }}>🎉 Memory saved</motion.p>
+                                    )}
+                                    <p className="text-sm font-bold mb-2" style={{ color: 'var(--leaf)' }}>✅ Mission Accomplished</p>
+                                    <div className="flex flex-col gap-1 mb-3">
+                                      {photoCount > 0 && <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>📸 {photoCount} photo{photoCount === 1 ? '' : 's'}</p>}
+                                      {videoCount > 0 && <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>🎬 {videoCount} video{videoCount === 1 ? '' : 's'}</p>}
+                                      {hasStory && <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>✍️ Story added</p>}
+                                      {photoCount === 0 && videoCount === 0 && !hasStory && <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>No photos or story yet</p>}
+                                    </div>
+                                    {missionsClosed ? (
+                                      <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)', opacity: 0.7 }}>📰 Submissions closed — building the newspaper</p>
+                                    ) : (
+                                      <button onClick={() => setExpanded(e => ({ ...e, [m.key]: true }))}
+                                        className="w-full py-2.5 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+                                        style={{ background: '#fff', color: 'var(--coral)', border: '1.5px solid var(--coral-soft)' }}>
+                                        Edit Contribution
+                                      </button>
+                                    )}
                                   </motion.div>
                                 )}
                               </div>
