@@ -420,6 +420,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     guest.mission_medium && { key: 'medium', level: 'Medium', badge: '🟡', icon: '🥂', accent: '#e0a93c', tint: 'var(--sunny-soft)', text: guest.mission_medium },
     guest.mission_legendary && { key: 'legendary', level: 'Legendary', badge: '🔥', icon: '🏆', accent: 'var(--coral)', tint: 'var(--coral-soft)', text: guest.mission_legendary },
   ].filter(Boolean) as { key: string; level: string; badge: string; icon: string; accent: string; tint: string; text: string }[]
+  const missionsDone = missionList.filter(m => !!progress[m.key]?.done).length
+  const sailDay = sleeps <= 0  // the birthday itself (or after) — countdown becomes celebration
 
   const stepIn = { opacity: 0, x: 36 }
   const stepAnim = { opacity: 1, x: 0 }
@@ -673,11 +675,45 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   <PhotoWaves />
                 </motion.div>
 
-                {/* Floating countdown badge overlapping the bottom of the photo */}
+                {/* Floating badge overlapping the photo — countdown, or celebration on the day */}
                 <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-                  className="relative mx-auto rounded-3xl px-4 py-5"
-                  style={{ width: '92%', marginTop: -46, background: '#fff', boxShadow: '0 18px 44px rgba(45,58,74,0.18)', zIndex: 6 }}>
-                  <CountdownHero target={targetMs} subline="The crew is assembling. See you on the water 🌊" />
+                  className="relative mx-auto rounded-3xl px-4 py-5 overflow-hidden"
+                  style={{ width: '92%', marginTop: -46, zIndex: 6,
+                    background: sailDay ? 'linear-gradient(135deg, var(--sunny), var(--coral))' : '#fff',
+                    boxShadow: sailDay ? '0 18px 44px rgba(255,122,89,0.4)' : '0 18px 44px rgba(45,58,74,0.18)' }}>
+                  {sailDay ? (
+                    <div className="text-center">
+                      <div className="inline-flex items-center gap-1.5 mb-2">
+                        <motion.span animate={{ opacity: [1, 0.25, 1] }} transition={{ duration: 1.4, repeat: Infinity }}
+                          style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
+                        <span style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.92)', fontWeight: 700 }}>
+                          The voyage is underway
+                        </span>
+                      </div>
+                      <motion.p animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                        style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.7rem', fontWeight: 700, color: '#fff', lineHeight: 1.1, marginBottom: '0.45rem' }}>
+                        🎉 {sleeps === 0 ? 'Today We Sail' : 'The Voyage Has Sailed'}
+                      </motion.p>
+                      <p className="text-sm" style={{ color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>The voyage has officially begun.</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.82)' }}>Captain {bdayName}'s crew has been called to duty.</p>
+
+                      {missionList.length > 0 && (
+                        <div className="mt-4 rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.3)' }}>
+                          <p style={{ fontSize: '0.6rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.9)', marginBottom: '0.3rem', fontWeight: 700 }}>
+                            🎯 Today's mission status
+                          </p>
+                          <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.35rem', fontWeight: 700, color: '#fff' }}>
+                            {missionsDone === missionList.length ? 'All missions complete 🏆' : `${missionsDone} of ${missionList.length} completed`}
+                          </p>
+                          <div className="mt-2 rounded-full overflow-hidden" style={{ height: 6, background: 'rgba(255,255,255,0.3)' }}>
+                            <div style={{ height: '100%', width: `${(missionsDone / missionList.length) * 100}%`, background: '#fff', borderRadius: 99, transition: 'width 0.4s ease' }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <CountdownHero target={targetMs} subline="The crew is assembling. See you on the water 🌊" />
+                  )}
                 </motion.div>
               </div>
 
