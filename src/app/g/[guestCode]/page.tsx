@@ -732,7 +732,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                                 {done && (
                                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="mt-4">
                                     <p className="text-sm font-semibold mb-1" style={{ color: 'var(--riviera-ink)' }}>Got proof? We want to see it 😎</p>
-                                    <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Tell future historians what happened. This goes in the memory book.</p>
+                                    <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Your photos and notes become part of {bdayName}'s birthday newspaper after the boat day.</p>
 
                                     <textarea
                                       value={noteDrafts[m.key] ?? ''}
