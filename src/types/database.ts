@@ -6,6 +6,7 @@ export type AssignedTo = 'all' | 'selected' | 'one'
 export type RsvpStatus = 'pending' | 'accepted' | 'declined'
 
 export type NotePriority = 'normal' | 'important' | 'required'
+export type NoteKind = 'required' | 'optional' | 'info'
 
 export interface NoteBlock {
   id?: string
@@ -15,6 +16,8 @@ export interface NoteBlock {
   link?: string
   button_label?: string
   priority?: NotePriority
+  kind?: NoteKind
+  markable?: boolean
 }
 
 export interface MissionProgressEntry {

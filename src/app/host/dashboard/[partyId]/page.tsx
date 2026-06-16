@@ -117,8 +117,11 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   function updateNote(i: number, field: keyof NoteBlock, value: string) {
     setNoteBlocks(n => n.map((x, j) => j === i ? ({ ...x, [field]: value } as NoteBlock) : x)); setNotesSaved(false)
   }
+  function updateNoteMarkable(i: number, value: boolean) {
+    setNoteBlocks(n => n.map((x, j) => j === i ? { ...x, markable: value } : x)); setNotesSaved(false)
+  }
   function addNote() {
-    setNoteBlocks(n => [...n, { id: genCode(), icon: '', title: '', text: '', link: '', button_label: '', priority: 'normal' }]); setNotesSaved(false)
+    setNoteBlocks(n => [...n, { id: genCode(), icon: '', title: '', text: '', link: '', button_label: '', kind: 'info' }]); setNotesSaved(false)
   }
   function removeNoteBlock(i: number) {
     setNoteBlocks(n => n.filter((_, j) => j !== i)); setNotesSaved(false)
@@ -135,15 +138,19 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     setSavingNotes(true); setNotesSaved(false)
     const cleaned = noteBlocks
       .filter(n => (n.text ?? '').trim() || (n.title ?? '').trim())
-      .map(n => ({
-        id: n.id || genCode(),
-        icon: (n.icon ?? '').trim() || undefined,
-        title: (n.title ?? '').trim() || undefined,
-        text: (n.text ?? '').trim(),
-        link: (n.link ?? '').trim() || undefined,
-        button_label: (n.button_label ?? '').trim() || undefined,
-        priority: n.priority || 'normal',
-      }))
+      .map(n => {
+        const kind = n.kind || (n.priority === 'required' ? 'required' : (n.link ? 'optional' : 'info'))
+        return {
+          id: n.id || genCode(),
+          icon: (n.icon ?? '').trim() || undefined,
+          title: (n.title ?? '').trim() || undefined,
+          text: (n.text ?? '').trim(),
+          link: (n.link ?? '').trim() || undefined,
+          button_label: (n.button_label ?? '').trim() || undefined,
+          kind,
+          markable: kind === 'optional' ? !!n.markable : undefined,
+        }
+      })
     const { error } = await supabase.from('parties').update({ event_notes: cleaned }).eq('id', partyId)
     if (!error) {
       setParty(p => p ? { ...p, event_notes: cleaned } : p)
@@ -487,18 +494,30 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                       <input value={n.link ?? ''} onChange={e => updateNote(i, 'link', e.target.value)} placeholder="https://link (optional)" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
                       <input value={n.button_label ?? ''} onChange={e => updateNote(i, 'button_label', e.target.value)} placeholder="Button text" className="w-28 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs" style={{ color: 'rgba(253,246,227,0.3)' }}>Priority:</span>
-                      {(['normal', 'important', 'required'] as const).map(pr => (
-                        <button key={pr} onClick={() => updateNote(i, 'priority', pr)}
-                          className="text-xs px-2.5 py-1 rounded-full transition-all capitalize"
-                          style={(n.priority || 'normal') === pr
-                            ? { background: pr === 'required' ? 'var(--terracotta)' : pr === 'important' ? 'var(--gold)' : 'rgba(255,255,255,0.2)', color: pr === 'important' ? 'var(--navy)' : 'var(--cream)', fontWeight: 700 }
-                            : { background: 'rgba(255,255,255,0.05)', color: 'rgba(253,246,227,0.4)' }}>
-                          {pr}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs" style={{ color: 'rgba(253,246,227,0.3)' }}>Type:</span>
+                      {([['required', 'Required'], ['optional', 'Optional'], ['info', 'Info']] as const).map(([k, label]) => {
+                        const curKind = n.kind || (n.priority === 'required' ? 'required' : (n.link ? 'optional' : 'info'))
+                        return (
+                          <button key={k} onClick={() => updateNote(i, 'kind', k)}
+                            className="text-xs px-2.5 py-1 rounded-full transition-all"
+                            style={curKind === k
+                              ? { background: k === 'required' ? 'var(--terracotta)' : k === 'optional' ? 'var(--gold)' : 'rgba(255,255,255,0.2)', color: k === 'optional' ? 'var(--navy)' : 'var(--cream)', fontWeight: 700 }
+                              : { background: 'rgba(255,255,255,0.05)', color: 'rgba(253,246,227,0.4)' }}>
+                            {label}
+                          </button>
+                        )
+                      })}
+                      {(n.kind || (n.priority === 'required' ? 'required' : (n.link ? 'optional' : 'info'))) === 'optional' && (
+                        <label className="flex items-center gap-1 text-xs ml-1 cursor-pointer" style={{ color: 'rgba(253,246,227,0.5)' }}>
+                          <input type="checkbox" checked={!!n.markable} onChange={e => updateNoteMarkable(i, e.target.checked)} />
+                          “Mark as Done”
+                        </label>
+                      )}
                     </div>
+                    <p className="text-[0.65rem] mt-1.5" style={{ color: 'rgba(253,246,227,0.25)' }}>
+                      Required = must be done to unlock missions · Optional = helpful, never blocks · Info = a note to read
+                    </p>
                   </div>
                 ))}
               </div>

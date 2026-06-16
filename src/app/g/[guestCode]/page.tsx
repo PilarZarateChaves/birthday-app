@@ -230,7 +230,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [evidenceBusy, setEvidenceBusy] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
-  const [crewOpen, setCrewOpen] = useState(false)
+  const [crewOpen, setCrewOpen] = useState(true)
+  const [prepOpen, setPrepOpen] = useState(true)
   const [prepDone, setPrepDone] = useState<Record<string, boolean>>({})
 
   async function loadCrew(partyId: string) {
@@ -417,13 +418,27 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
   const targetMs = eventTargetMs(party.party_date, party.event_time)
   const notes = Array.isArray(party.event_notes) ? party.event_notes : []
-  const prepRank = (p?: string) => (p === 'required' ? 0 : p === 'important' ? 1 : 2)
-  const prepNotes = [...notes].sort((a, b) => prepRank(a.priority) - prepRank(b.priority))
-  const prepState = prepNotes.map((n, i) => ({ n, pid: n.id || `i${i}`, done: !!prepDone[n.id || `i${i}`] }))
-  const prepDoneCount = prepState.filter(x => x.done).length
-  const requiredState = prepState.filter(x => x.n.priority === 'required')
-  const requiredAllDone = requiredState.every(x => x.done)
+  const noteKind = (n: typeof notes[number]): 'required' | 'optional' | 'info' =>
+    n.kind || (n.priority === 'required' ? 'required' : (n.link ? 'optional' : 'info'))
+  const kindRank = (k: string) => (k === 'required' ? 0 : k === 'optional' ? 1 : 2)
+  const prepNotes = [...notes].sort((a, b) => kindRank(noteKind(a)) - kindRank(noteKind(b)))
+  const prepState = prepNotes.map((n, i) => {
+    const kind = noteKind(n)
+    const markable = kind === 'required' || (kind === 'optional' && !!n.markable)
+    const pid = n.id || `i${i}`
+    return { n, pid, kind, markable, done: !!prepDone[pid] }
+  })
+  const requiredState = prepState.filter(x => x.kind === 'required')
+  const requiredDone = requiredState.filter(x => x.done).length
+  const requiredAllDone = requiredDone === requiredState.length
   const canReveal = requiredState.length === 0 || requiredAllDone
+  const markableState = prepState.filter(x => x.markable)
+  const markableDone = markableState.filter(x => x.done).length
+  const prepStatus = requiredState.length > 0
+    ? `${requiredDone} of ${requiredState.length} required done`
+    : markableState.length > 0
+      ? `${markableDone} of ${markableState.length} done`
+      : `${prepNotes.length} note${prepNotes.length === 1 ? '' : 's'} to read`
   const missionsRevealed = !!guest.mission_accepted
   const links = Array.isArray(party.event_links) ? party.event_links : []
   const firstName = guest.name.split(' ')[0]
@@ -713,7 +728,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                       <p className="text-xs font-bold" style={{ color: 'var(--riviera-ink)' }}>⚓ Crew Is Boarding</p>
                       <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>{crew.length} crew member{crew.length === 1 ? '' : 's'} confirmed</p>
                     </div>
-                    <span style={{ color: 'var(--riviera-ink-soft)', fontSize: 10, opacity: 0.6 }}>{crewOpen ? '▲' : '▼'}</span>
+                    <span style={{ color: 'var(--riviera-ink-soft)', fontSize: 11, opacity: 0.6 }}>{crewOpen ? '⌃' : '⌄'}</span>
                   </button>
 
                   <AnimatePresence initial={false}>
@@ -742,107 +757,125 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 </div>
               )}
 
-              {/* ── BEFORE WE SET SAIL (magical boarding pass) ── */}
+              {/* ── BEFORE WE SET SAIL (collapsible magical boarding pass) ── */}
               {prepNotes.length > 0 && (
                 <div className="rounded-3xl overflow-hidden mb-7 relative" style={{ background: 'linear-gradient(160deg, #fffdf4 0%, var(--sunny-soft) 55%, var(--coral-soft) 100%)', boxShadow: '0 10px 30px rgba(201,168,76,0.2)', border: '1px solid rgba(201,168,76,0.25)' }}>
                   {/* floating sparkles */}
                   {[{ t: 14, l: '12%', s: 6, d: '0s' }, { t: 40, l: '86%', s: 5, d: '1.1s' }, { t: 120, l: '8%', s: 4, d: '0.6s' }, { t: 80, l: '92%', s: 5, d: '1.6s' }].map((sp, i) => (
                     <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(201,168,76,0.7) 55%, transparent 100%)', animation: `twinkle 3.4s ease-in-out ${sp.d} infinite`, zIndex: 1 }} />
                   ))}
-                  <div className="px-5 py-5 relative" style={{ zIndex: 2 }}>
-                    <div className="text-center mb-4">
-                      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.15 }}>
+                  <button onClick={() => setPrepOpen(o => !o)} className="w-full flex items-center gap-3 px-5 py-4 text-left relative active:scale-[0.99] transition-all" style={{ zIndex: 2 }}>
+                    <div className="flex-1 min-w-0">
+                      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.15 }}>
                         ✨ Before We Set Sail ✨
                       </p>
-                      <p className="text-xs mt-1" style={{ color: 'var(--riviera-ink-soft)' }}>
-                        Before joining Captain {bdayName}'s voyage, a few things to take care of.
-                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--riviera-ink-soft)' }}>{prepStatus}</p>
                     </div>
+                    <span style={{ color: 'var(--riviera-ink-soft)', fontSize: 11, opacity: 0.6 }}>{prepOpen ? '⌃' : '⌄'}</span>
+                  </button>
 
-                    <div className="flex flex-col gap-3">
-                      {prepState.map(({ n, pid, done: checked }, i) => {
-                        const required = n.priority === 'required'
-                        const important = n.priority === 'important'
-                        const accent = required ? 'var(--coral)' : important ? 'var(--gold)' : 'var(--sky)'
-                        return (
-                          <motion.div key={pid} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.06 }}
-                            className="rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: required ? '0 8px 22px rgba(255,122,89,0.2)' : '0 4px 16px rgba(45,58,74,0.07)', border: required ? '1.5px solid rgba(255,122,89,0.4)' : '1px solid rgba(45,58,74,0.05)' }}>
-                            {required && (
-                              <div className="px-4 py-1.5 flex items-center gap-1.5" style={{ background: 'var(--coral)' }}>
-                                <span style={{ fontSize: 11 }}>🚨</span>
-                                <span style={{ fontSize: '0.56rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#fff', fontWeight: 700 }}>Required before boarding</span>
-                              </div>
-                            )}
-                            <div className="px-4 py-3.5">
-                              <div className="flex items-start gap-3">
-                                <span style={{ fontSize: 19, marginTop: 1, flexShrink: 0 }}>{n.icon || (required ? '🚨' : '📌')}</span>
-                                <div className="flex-1 min-w-0">
-                                  {n.title && <p className="text-sm font-bold" style={{ color: 'var(--riviera-ink)' }}>{n.title}</p>}
-                                  <p className="text-sm leading-relaxed" style={{ color: n.title ? 'var(--riviera-ink-soft)' : 'var(--riviera-ink)' }}>{n.text}</p>
-                                  {n.link && (
-                                    <a href={n.link} target="_blank" rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 mt-2 px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
-                                      style={{ background: accent, color: '#fff', textDecoration: 'none' }}>
-                                      {n.button_label || 'Open'} →
-                                    </a>
+                  <AnimatePresence initial={false}>
+                    {prepOpen && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} className="overflow-hidden relative" style={{ zIndex: 2 }}>
+                        <div className="px-5 pb-5 pt-1 flex flex-col gap-3">
+                          {prepState.map(({ n, pid, kind, markable, done: checked }, i) => {
+                            const required = kind === 'required'
+                            const accent = required ? 'var(--coral)' : kind === 'optional' ? 'var(--gold)' : 'var(--sky)'
+                            return (
+                              <motion.div key={pid} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.06 }}
+                                className="rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: required ? '0 8px 22px rgba(255,122,89,0.2)' : '0 4px 16px rgba(45,58,74,0.07)', border: required ? '1.5px solid rgba(255,122,89,0.4)' : '1px solid rgba(45,58,74,0.05)' }}>
+                                {required && (
+                                  <div className="px-4 py-1.5 flex items-center gap-1.5" style={{ background: 'var(--coral)' }}>
+                                    <span style={{ fontSize: 11 }}>🚨</span>
+                                    <span style={{ fontSize: '0.56rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#fff', fontWeight: 700 }}>Required before boarding</span>
+                                  </div>
+                                )}
+                                <div className="px-4 py-3.5">
+                                  <div className="flex items-start gap-3">
+                                    <span style={{ fontSize: 19, marginTop: 1, flexShrink: 0 }}>{n.icon || (required ? '🚨' : kind === 'optional' ? '🎵' : '📌')}</span>
+                                    <div className="flex-1 min-w-0">
+                                      {n.title && <p className="text-sm font-bold" style={{ color: 'var(--riviera-ink)' }}>{n.title}</p>}
+                                      <p className="text-sm leading-relaxed" style={{ color: n.title ? 'var(--riviera-ink-soft)' : 'var(--riviera-ink)' }}>{n.text}</p>
+                                      {n.link && (
+                                        <a href={n.link} target="_blank" rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 mt-2 px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
+                                          style={{ background: accent, color: '#fff', textDecoration: 'none' }}>
+                                          {n.button_label || 'Open'} →
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {markable && (
+                                    <button onClick={() => togglePrep(pid)}
+                                      className="w-full mt-2.5 py-2 rounded-xl font-bold text-xs active:scale-95 transition-all"
+                                      style={checked ? { background: 'var(--leaf-soft)', color: 'var(--leaf)' } : { background: 'rgba(45,58,74,0.05)', color: 'var(--riviera-ink-soft)' }}>
+                                      {checked ? '✅ Done' : 'Mark as Done'}
+                                    </button>
                                   )}
                                 </div>
-                              </div>
-                              <button onClick={() => togglePrep(pid)}
-                                className="w-full mt-2.5 py-2 rounded-xl font-bold text-xs active:scale-95 transition-all"
-                                style={checked ? { background: 'var(--leaf-soft)', color: 'var(--leaf)' } : { background: 'rgba(45,58,74,0.05)', color: 'var(--riviera-ink-soft)' }}>
-                                {checked ? '✅ Done' : 'Mark as done'}
-                              </button>
-                            </div>
-                          </motion.div>
-                        )
-                      })}
-                    </div>
-
-                    <p className="text-center text-xs font-bold mt-4" style={{ color: 'var(--riviera-ink-soft)' }}>
-                      ✅ {prepDoneCount} of {prepNotes.length} completed
-                    </p>
-                  </div>
+                              </motion.div>
+                            )
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
 
-              {/* ── REVEAL GATE → MISSION CAROUSEL ── */}
-              {missionList.length > 0 && !missionsRevealed && (
-                <div className="rounded-3xl px-6 py-8 mb-7 text-center" style={{ background: canReveal ? 'linear-gradient(135deg, var(--sunny), var(--coral))' : '#fff', boxShadow: canReveal ? '0 14px 38px rgba(255,122,89,0.35)' : '0 6px 22px rgba(45,58,74,0.08)', border: canReveal ? 'none' : '1.5px dashed var(--coral-soft)' }}>
-                  {!missionsLive ? (
-                    <>
-                      <p style={{ fontSize: '1.9rem', marginBottom: '0.4rem' }}>🤫</p>
-                      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>Your missions are sealed</p>
-                      <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>The Captain releases them closer to the day 🍋</p>
-                    </>
-                  ) : canReveal ? (
-                    <>
-                      <p style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>{requiredState.length > 0 ? '✨' : '🎯'}</p>
-                      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.4rem', fontWeight: 700, color: '#fff', marginBottom: '0.3rem' }}>
-                        {requiredState.length > 0 ? 'All Set For Departure' : 'Secret Assignments Await'}
-                      </p>
-                      <p className="text-sm mb-5" style={{ color: 'rgba(255,255,255,0.92)' }}>
-                        {requiredState.length > 0 ? 'The captain has approved your boarding pass.' : 'Three secret missions are waiting for you.'}
-                      </p>
-                      <button onClick={revealMissions}
-                        className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
-                        style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 8px 22px rgba(0,0,0,0.12)' }}>
-                        🎯 Reveal My Missions
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>🎯</p>
-                      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.4rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>Secret Assignments Await</p>
-                      <p className="text-sm mb-5" style={{ color: 'var(--riviera-ink-soft)' }}>Finish the required boarding items above to unlock your missions.</p>
-                      <button disabled
-                        className="w-full py-4 rounded-2xl font-bold text-base"
-                        style={{ background: 'rgba(45,58,74,0.08)', color: 'var(--riviera-ink-soft)' }}>
-                        🔒 Reveal My Missions
-                      </button>
-                    </>
-                  )}
+              {/* ── LOCKED MISSION AREA → reveal → carousel ── */}
+              {missionList.length > 0 && !missionsRevealed && !missionsLive && (
+                <div className="rounded-3xl px-6 py-8 mb-7 text-center" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.08)', border: '1.5px dashed var(--coral-soft)' }}>
+                  <p style={{ fontSize: '1.9rem', marginBottom: '0.4rem' }}>🤫</p>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>Your missions are sealed</p>
+                  <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>The Captain releases them closer to the day 🍋</p>
                 </div>
+              )}
+
+              {missionList.length > 0 && !missionsRevealed && missionsLive && canReveal && (
+                <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }}
+                  className="rounded-3xl px-6 py-8 mb-7 text-center relative overflow-hidden"
+                  style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', boxShadow: '0 14px 38px rgba(255,122,89,0.38)' }}>
+                  {[{ t: 14, l: '12%', s: 6, d: '0s' }, { t: 26, l: '85%', s: 5, d: '1s' }, { t: '72%', l: '9%', s: 5, d: '0.6s' }, { t: '64%', l: '88%', s: 6, d: '1.5s' }].map((sp, i) => (
+                    <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,255,255,0.7) 55%, transparent 100%)', animation: `twinkle 3s ease-in-out ${sp.d} infinite` }} />
+                  ))}
+                  <div className="relative" style={{ zIndex: 2 }}>
+                    <motion.p animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>✨</motion.p>
+                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.45rem', fontWeight: 700, color: '#fff', marginBottom: '0.3rem' }}>Boarding Approved</p>
+                    <p className="text-sm mb-5" style={{ color: 'rgba(255,255,255,0.92)' }}>Your missions are ready.</p>
+                    <button onClick={revealMissions}
+                      className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
+                      style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 8px 22px rgba(0,0,0,0.14)' }}>
+                      🎯 Reveal My Missions
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {missionList.length > 0 && !missionsRevealed && missionsLive && !canReveal && (
+                <motion.div className="rounded-3xl px-6 py-8 mb-7 text-center relative overflow-hidden" style={{ background: '#fff' }}
+                  animate={{ boxShadow: ['0 0 0 1px rgba(201,168,76,0.35), 0 0 16px rgba(201,168,76,0.2)', '0 0 0 1.5px rgba(201,168,76,0.85), 0 0 34px rgba(201,168,76,0.5)', '0 0 0 1px rgba(201,168,76,0.35), 0 0 16px rgba(201,168,76,0.2)'] }}
+                  transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}>
+                  {/* shimmer sweep */}
+                  <motion.div initial={{ x: '-130%' }} animate={{ x: '330%' }} transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut', repeatDelay: 0.5 }}
+                    style={{ position: 'absolute', top: 0, bottom: 0, width: '45%', background: 'linear-gradient(105deg, transparent, rgba(201,168,76,0.2), transparent)', transform: 'skewX(-12deg)', pointerEvents: 'none' }} />
+                  {/* floating sparkles */}
+                  {[{ t: 16, l: '14%', s: 6, d: '0s' }, { t: 30, l: '84%', s: 5, d: '1s' }, { t: '70%', l: '10%', s: 4, d: '0.6s' }, { t: '62%', l: '88%', s: 5, d: '1.5s' }].map((sp, i) => (
+                    <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(201,168,76,0.7) 55%, transparent 100%)', animation: `twinkle 3.2s ease-in-out ${sp.d} infinite` }} />
+                  ))}
+                  <div className="relative" style={{ zIndex: 2 }}>
+                    <p style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>🔒</p>
+                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.4rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.3rem' }}>Missions Locked</p>
+                    <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)', marginBottom: '1rem' }}>
+                      Complete the required boarding item{requiredState.length === 1 ? '' : 's'} above to unlock your assignments.
+                    </p>
+                    <p className="text-xs font-bold" style={{ color: 'var(--coral)', marginBottom: '0.5rem' }}>{requiredDone} of {requiredState.length} completed</p>
+                    <div className="mx-auto rounded-full overflow-hidden" style={{ height: 8, width: '72%', background: 'rgba(45,58,74,0.08)' }}>
+                      <motion.div animate={{ width: `${requiredState.length ? (requiredDone / requiredState.length) * 100 : 0}%` }} transition={{ duration: 0.5 }}
+                        style={{ height: '100%', background: 'linear-gradient(90deg, var(--sunny), var(--coral))', borderRadius: 99 }} />
+                    </div>
+                  </div>
+                </motion.div>
               )}
 
               {/* ── MISSIONS: swipeable deck (after reveal) ── */}
@@ -1000,26 +1033,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   </motion.div>
                 )
               })()}
-
-              {/* ── DEPARTURE DETAILS ── */}
-              <div className="rounded-3xl px-5 py-4 mb-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
-                {sectionLabel('Departure details')}
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex items-start gap-3">
-                    <span style={{ fontSize: 15, marginTop: 1 }}>📅</span>
-                    <div>
-                      <p className="text-sm font-semibold" style={{ color: 'var(--riviera-ink)' }}>{partyDate}</p>
-                      {party.event_time && <p className="text-xs mt-0.5" style={{ color: 'var(--riviera-ink-soft)' }}>{party.event_time}</p>}
-                    </div>
-                  </div>
-                  {party.event_location && (
-                    <div className="flex items-start gap-3"><span style={{ fontSize: 15, marginTop: 1 }}>📍</span><p className="text-sm" style={{ color: 'var(--riviera-ink)' }}>{party.event_location}</p></div>
-                  )}
-                  {party.meeting_point && (
-                    <div className="flex items-start gap-3"><span style={{ fontSize: 15, marginTop: 1 }}>🚢</span><p className="text-sm" style={{ color: 'var(--riviera-ink)' }}>{party.meeting_point}</p></div>
-                  )}
-                </div>
-              </div>
 
               {links.length > 0 && (
                 <div className="flex flex-col gap-2 mb-2">
