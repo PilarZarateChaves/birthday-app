@@ -255,6 +255,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [evidenceBusy, setEvidenceBusy] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
+  const [crewOpen, setCrewOpen] = useState(false)
 
   async function loadCrew(partyId: string) {
     const { data } = await supabase.from('guests').select('name, photo').eq('party_id', partyId).eq('rsvp_status', 'accepted')
@@ -745,6 +746,56 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   )}
                 </motion.div>
               </div>
+
+              {/* ── CREW IS BOARDING (collapsed by default) ── */}
+              {crew.length > 0 && (
+                <div className="mb-7 rounded-3xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
+                  <button onClick={() => setCrewOpen(o => !o)} className="w-full flex items-center gap-3 px-4 py-3 text-left active:scale-[0.99] transition-all">
+                    <div className="flex items-center flex-shrink-0">
+                      {crew.slice(0, 5).map((c, i) => (
+                        <div key={i} className="rounded-full overflow-hidden flex items-center justify-center"
+                          style={{ width: 30, height: 30, marginLeft: i === 0 ? 0 : -10, border: '2px solid #fff', background: 'linear-gradient(135deg, var(--sunny-soft), var(--coral-soft))', color: 'var(--coral)', fontSize: 11, fontWeight: 700, zIndex: 5 - i }}>
+                          {c.photo ? <img src={c.photo} alt="" className="w-full h-full object-cover" /> : (c.name?.[0] ?? '⚓')}
+                        </div>
+                      ))}
+                      {crew.length > 5 && (
+                        <div className="rounded-full flex items-center justify-center" style={{ width: 30, height: 30, marginLeft: -10, border: '2px solid #fff', background: 'var(--sky-soft)', color: 'var(--sky)', fontSize: 10, fontWeight: 700 }}>
+                          +{crew.length - 5}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold" style={{ color: 'var(--riviera-ink)' }}>⚓ Crew Is Boarding</p>
+                      <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>{crew.length} crew member{crew.length === 1 ? '' : 's'} confirmed</p>
+                    </div>
+                    <span style={{ color: 'var(--riviera-ink-soft)', fontSize: 10, opacity: 0.6 }}>{crewOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  <AnimatePresence initial={false}>
+                    {crewOpen && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} className="overflow-hidden">
+                        <div className="px-4 pb-6 pt-2 flex flex-wrap justify-center gap-x-3 gap-y-5" style={{ background: 'var(--riviera-bg)' }}>
+                          {crew.map((c, i) => {
+                            const rot = [-5, 4, -3, 6, -6, 3, -2, 5][i % 8]
+                            return (
+                              <motion.div key={i}
+                                initial={{ opacity: 0, y: 12, rotate: 0 }} animate={{ opacity: 1, y: 0, rotate: rot }}
+                                transition={{ duration: 0.4, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                                style={{ width: 92, background: '#fff', boxShadow: '0 6px 18px rgba(45,58,74,0.18)', borderRadius: 6 }}
+                                className="p-1.5 pb-2.5">
+                                {c.photo
+                                  ? <img src={c.photo} alt="" className="w-full aspect-square object-cover" style={{ borderRadius: 3 }} />
+                                  : <div className="w-full aspect-square flex items-center justify-center" style={{ borderRadius: 3, background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '1.8rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{c.name?.[0] ?? '⚓'}</div>}
+                                <p className="text-center mt-1.5" style={{ fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--riviera-ink)' }}>{c.name?.split(' ')[0]}</p>
+                              </motion.div>
+                            )
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
 
               {/* ── MISSIONS: swipeable deck ── */}
               {missionsLive && missionList.length > 0 && (() => {
