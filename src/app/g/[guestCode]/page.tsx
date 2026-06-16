@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import type { Party, Guest, MissionProgress } from '@/types/database'
 
-type Step = 'invitation' | 'role' | 'missions' | 'allset' | 'captainslog' | 'declined'
+type Step = 'invitation' | 'role' | 'beforesail' | 'missions' | 'allset' | 'captainslog' | 'declined'
 type CrewMate = { name: string; photo: string | null }
 
 // ─────────────────────────────────────────────────────────
@@ -100,11 +100,11 @@ function PhotoWaves() {
 // ─────────────────────────────────────────────────────────
 // Step progress dots (1-2-3 wizard)
 // ─────────────────────────────────────────────────────────
-const WIZARD_STEPS: Step[] = ['invitation', 'role', 'missions']
+const WIZARD_STEPS: Step[] = ['invitation', 'beforesail', 'missions']
 function StepDots({ current }: { current: Step }) {
   const idx = WIZARD_STEPS.indexOf(current)
   if (idx < 0) return null
-  const labels = ['Invitation', 'Your role', 'Missions']
+  const labels = ['Invitation', 'Before we sail', 'Your missions']
   return (
     <div className="flex flex-col items-center gap-2 pt-7 pb-1">
       <div className="flex items-center gap-2">
@@ -256,6 +256,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
   const [crewOpen, setCrewOpen] = useState(false)
+  const [prepDone, setPrepDone] = useState<Record<string, boolean>>({})
 
   async function loadCrew(partyId: string) {
     const { data } = await supabase.from('guests').select('name, photo').eq('party_id', partyId).eq('rsvp_status', 'accepted')
@@ -284,6 +285,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
         const mp = (g.mission_progress && typeof g.mission_progress === 'object') ? g.mission_progress : {}
         setProgress(mp)
         setNoteDrafts(Object.fromEntries(Object.entries(mp).map(([k, v]) => [k, v?.note ?? ''])))
+        setPrepDone((g.prep_progress && typeof g.prep_progress === 'object') ? g.prep_progress : {})
         const ended = p?.status === 'ended'
         const start: Step =
           g.rsvp_status === 'declined' ? 'declined'
@@ -412,6 +414,18 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     setActiveMission(i => Math.min(count - 1, Math.max(0, i + dir)))
   }
 
+  async function togglePrep(id: string) {
+    const next = { ...prepDone, [id]: !prepDone[id] }
+    setPrepDone(next)
+    if (guest) await supabase.from('guests').update({ prep_progress: next }).eq('id', guest.id)
+  }
+
+  function revealMissions() {
+    fire()
+    setMissionDir(1)
+    setStep('missions')
+  }
+
   if (loading) return <main className="min-h-screen" style={{ background: 'var(--riviera-bg)' }} />
 
   if (notFound || !guest || !party) return (
@@ -435,6 +449,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
   const targetMs = eventTargetMs(party.party_date, party.event_time)
   const notes = Array.isArray(party.event_notes) ? party.event_notes : []
+  const prepRank = (p?: string) => (p === 'required' ? 0 : p === 'important' ? 1 : 2)
+  const prepNotes = [...notes].sort((a, b) => prepRank(a.priority) - prepRank(b.priority))
   const links = Array.isArray(party.event_links) ? party.event_links : []
   const firstName = guest.name.split(' ')[0]
   const bdayName = party.birthday_person_name
@@ -478,7 +494,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
       <div className="fixed pointer-events-none" style={{ bottom: '-14%', left: '-10%', width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(95,182,230,0.32) 0%, transparent 70%)', filter: 'blur(26px)' }} />
       <div className="fixed pointer-events-none" style={{ bottom: '6%', right: '-16%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(247,168,196,0.34) 0%, transparent 70%)', filter: 'blur(22px)' }} />
 
-      {(step === 'invitation' || step === 'role' || step === 'allset') && <MarinaBackdrop />}
+      {(step === 'invitation' || step === 'role' || step === 'beforesail' || step === 'allset') && <MarinaBackdrop />}
 
       {showConfetti && <Confetti />}
 
@@ -533,6 +549,13 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 className="text-[0.97rem] leading-[1.85] mb-2" style={{ color: 'var(--riviera-ink-soft)', whiteSpace: 'pre-wrap' }}>
                 {storyText}
               </motion.p>
+
+              {/* Event details — small + secondary, under the hero */}
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.42 }}
+                className="flex items-center justify-center gap-4 mt-3 text-sm" style={{ color: 'var(--riviera-ink)' }}>
+                <span>📅 {partyDate}</span>
+                {party.event_time && <><span style={{ opacity: 0.3 }}>·</span><span>🕒 {party.event_time}</span></>}
+              </motion.div>
 
               {crew.length > 0 && (
                 <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
@@ -627,16 +650,100 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
               )}
 
               <div className="pt-7 pb-4">
-                <button onClick={() => setStep('missions')}
+                <button onClick={() => { setMissionDir(1); setStep('beforesail') }}
                   className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
                   style={{ background: 'var(--coral)', color: '#fff', boxShadow: '0 8px 24px rgba(255,122,89,0.4)' }}>
-                  Reveal my missions →
+                  Continue →
                 </button>
               </div>
             </motion.div>
           )}
 
-          {/* ════════ SCREEN 3 — MISSIONS ════════ */}
+          {/* ════════ PHASE 2 — BEFORE WE SET SAIL ════════ */}
+          {step === 'beforesail' && (
+            <motion.div key="beforesail" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
+              className="flex-1 flex flex-col justify-center py-6">
+
+              {/* magical header */}
+              <div className="text-center mb-6">
+                <motion.p initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, type: 'spring', stiffness: 200 }}
+                  style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>⚓</motion.p>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.55rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.15, marginBottom: '0.5rem' }}>
+                  Before We Set Sail
+                </h2>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  Before we leave the harbor, a few small things from Captain {bdayName}.
+                </p>
+              </div>
+
+              {prepNotes.length === 0 ? (
+                <div className="rounded-3xl px-5 py-8 text-center mb-6" style={{ background: 'rgba(255,255,255,0.6)', border: '1.5px dashed var(--sunny)' }}>
+                  <p className="text-sm" style={{ color: 'var(--riviera-ink-soft)' }}>Nothing to prep — just bring yourself and good energy 🌊</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 mb-7">
+                  {prepNotes.map((n, i) => {
+                    const pid = n.id || `i${i}`
+                    const checked = !!prepDone[pid]
+                    const required = n.priority === 'required'
+                    const important = n.priority === 'important'
+                    const accent = required ? 'var(--coral)' : important ? 'var(--gold)' : 'var(--sky)'
+                    const bg = required ? 'linear-gradient(135deg, var(--coral-soft), #fff)' : important ? 'linear-gradient(135deg, var(--sunny-soft), #fff)' : '#fff'
+                    return (
+                      <motion.div key={pid} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.08 + i * 0.07 }}
+                        className="rounded-3xl overflow-hidden" style={{ background: bg, boxShadow: required ? '0 10px 28px rgba(255,122,89,0.22)' : '0 6px 22px rgba(45,58,74,0.08)', border: required ? '1.5px solid rgba(255,122,89,0.4)' : '1px solid rgba(45,58,74,0.05)' }}>
+                        {required && (
+                          <div className="px-4 py-1.5 flex items-center gap-1.5" style={{ background: 'var(--coral)' }}>
+                            <span style={{ fontSize: 11 }}>🚨</span>
+                            <span style={{ fontSize: '0.58rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#fff', fontWeight: 700 }}>Required before boarding</span>
+                          </div>
+                        )}
+                        <div className="px-4 py-4">
+                          <div className="flex items-start gap-3">
+                            <span style={{ fontSize: 20, marginTop: 1, flexShrink: 0 }}>{n.icon || (required ? '🚨' : '📌')}</span>
+                            <div className="flex-1 min-w-0">
+                              {n.title && <p className="text-sm font-bold" style={{ color: 'var(--riviera-ink)' }}>{n.title}</p>}
+                              <p className="text-sm leading-relaxed" style={{ color: n.title ? 'var(--riviera-ink-soft)' : 'var(--riviera-ink)' }}>{n.text}</p>
+                              {n.link && (
+                                <a href={n.link} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 mt-2.5 px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
+                                  style={{ background: accent, color: '#fff', textDecoration: 'none' }}>
+                                  {n.button_label || 'Open'} →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <button onClick={() => togglePrep(pid)}
+                            className="w-full mt-3 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all"
+                            style={checked
+                              ? { background: 'var(--leaf-soft)', color: 'var(--leaf)' }
+                              : { background: 'rgba(45,58,74,0.05)', color: 'var(--riviera-ink-soft)' }}>
+                            {checked ? '✅ Done' : 'Mark as done'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {guest.mission_accepted ? (
+                <button onClick={() => { setMissionDir(-1); setStep('allset') }}
+                  className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
+                  style={{ background: 'var(--coral)', color: '#fff', boxShadow: '0 8px 24px rgba(255,122,89,0.4)' }}>
+                  Done →
+                </button>
+              ) : (
+                <button onClick={revealMissions}
+                  className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
+                  style={{ background: 'var(--gold)', color: 'var(--riviera-ink)', boxShadow: '0 8px 26px rgba(201,168,76,0.5)' }}>
+                  🎯 Reveal My Missions
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* ════════ PHASE 3 — MISSIONS ════════ */}
           {step === 'missions' && (
             <motion.div key="missions" initial={stepIn} animate={stepAnim} exit={stepOut} transition={stepT}
               className="flex-1 flex flex-col justify-center py-6">
@@ -953,33 +1060,23 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 )
               })()}
 
-              {/* ── CAPTAIN'S NOTES ── */}
-              {notes.length > 0 && (
-                <div className="rounded-3xl px-5 py-5 mb-4" style={{ background: 'var(--leaf-soft)' }}>
-                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.2rem' }}>
-                    📝 Captain's Notes
-                  </p>
-                  <p className="text-xs mb-4" style={{ color: 'var(--riviera-ink-soft)' }}>A few tiny things from the captain before we set sail.</p>
-                  <div className="flex flex-col gap-3.5">
-                    {notes.map((n, i) => (
-                      <div key={i} className="flex items-start gap-2.5">
-                        {n.icon && <span style={{ fontSize: 17, marginTop: 1, flexShrink: 0 }}>{n.icon}</span>}
-                        <div className="flex-1">
-                          {n.title && <p className="text-sm font-bold" style={{ color: 'var(--riviera-ink)' }}>{n.title}</p>}
-                          <p className="text-sm leading-relaxed" style={{ color: n.title ? 'var(--riviera-ink-soft)' : 'var(--riviera-ink)' }}>{n.text}</p>
-                          {n.link && (
-                            <a href={n.link} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 mt-2 px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
-                              style={{ background: 'var(--leaf)', color: '#fff', textDecoration: 'none' }}>
-                              {n.button_label || 'Open'} →
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* ── BEFORE WE SET SAIL — revisit link (kept separate from missions) ── */}
+              {notes.length > 0 && (() => {
+                const prepCount = notes.length
+                const prepComplete = notes.filter((n, i) => prepDone[n.id || `i${i}`]).length
+                return (
+                  <button onClick={() => setStep('beforesail')}
+                    className="w-full flex items-center gap-3 rounded-3xl px-5 py-4 mb-4 text-left active:scale-[0.99] transition-all"
+                    style={{ background: 'var(--leaf-soft)' }}>
+                    <span style={{ fontSize: 22 }}>⚓</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: 'var(--riviera-ink)' }}>Before We Set Sail</p>
+                      <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>{prepComplete} of {prepCount} done · tap to review</p>
+                    </div>
+                    <span style={{ color: 'var(--leaf)', fontSize: 14 }}>→</span>
+                  </button>
+                )
+              })()}
 
               {/* ── DEPARTURE DETAILS ── */}
               <div className="rounded-3xl px-5 py-4 mb-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>

@@ -5,12 +5,16 @@ export type Difficulty = 'easy' | 'medium' | 'hard'
 export type AssignedTo = 'all' | 'selected' | 'one'
 export type RsvpStatus = 'pending' | 'accepted' | 'declined'
 
+export type NotePriority = 'normal' | 'important' | 'required'
+
 export interface NoteBlock {
+  id?: string
   icon?: string
   title?: string
   text: string
   link?: string
   button_label?: string
+  priority?: NotePriority
 }
 
 export interface MissionProgressEntry {
@@ -77,6 +81,7 @@ export interface Guest {
   memory_future_prediction: string | null
   memory_photos: string[]
   mission_progress: MissionProgress
+  prep_progress: Record<string, boolean>
   invite_code: string | null
   is_host: boolean
   created_at: string

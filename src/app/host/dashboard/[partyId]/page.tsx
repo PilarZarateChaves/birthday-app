@@ -51,6 +51,8 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [showCopyEditor, setShowCopyEditor] = useState(false)
   const [headlineDraft, setHeadlineDraft] = useState('')
   const [storyDraft, setStoryDraft] = useState('')
+  const [dateDraft, setDateDraft] = useState('')
+  const [timeDraft, setTimeDraft] = useState('')
   const [savingCopy, setSavingCopy] = useState(false)
   const [copySaved, setCopySaved] = useState(false)
   const [copyError, setCopyError] = useState('')
@@ -73,6 +75,8 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     if (p) {
       setHeadlineDraft(p.invite_headline ?? `{name}, ${p.birthday_person_name} is throwing a boat day 🚢`)
       setStoryDraft(p.party_story ?? '')
+      setDateDraft(p.party_date ?? '')
+      setTimeDraft(p.event_time ?? '')
       setNoteBlocks(Array.isArray(p.event_notes) ? p.event_notes : [])
     }
     setGuests((g ?? []).filter((x: Guest) => x.name))
@@ -86,20 +90,22 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     setCopyError('')
     const headline = headlineDraft.trim() || null
     const story = storyDraft.trim() || null
+    const pdate = dateDraft || null
+    const ptime = timeDraft.trim() || null
 
-    const { error } = await supabase.from('parties').update({ invite_headline: headline, party_story: story }).eq('id', partyId)
+    const { error } = await supabase.from('parties').update({ invite_headline: headline, party_story: story, party_date: pdate, event_time: ptime }).eq('id', partyId)
     if (!error) {
-      setParty(p => p ? { ...p, invite_headline: headline, party_story: story } : p)
+      setParty(p => p ? { ...p, invite_headline: headline, party_story: story, party_date: pdate ?? p.party_date, event_time: ptime } : p)
       setCopySaved(true)
       setTimeout(() => setCopySaved(false), 2500)
       setSavingCopy(false)
       return
     }
 
-    // Headline column may not exist yet — still save the story so editing works today.
-    const retry = await supabase.from('parties').update({ party_story: story }).eq('id', partyId)
+    // Headline column may not exist yet — still save the rest so editing works today.
+    const retry = await supabase.from('parties').update({ party_story: story, party_date: pdate, event_time: ptime }).eq('id', partyId)
     if (!retry.error) {
-      setParty(p => p ? { ...p, party_story: story } : p)
+      setParty(p => p ? { ...p, party_story: story, party_date: pdate ?? p.party_date, event_time: ptime } : p)
       setCopyError('Story saved. To edit the headline too, run the one-line SQL (alter table parties add column invite_headline text) then save again.')
     } else {
       setCopyError(retry.error.message)
@@ -109,10 +115,10 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
   // ── Captain's Notes (event_notes) ──
   function updateNote(i: number, field: keyof NoteBlock, value: string) {
-    setNoteBlocks(n => n.map((x, j) => j === i ? { ...x, [field]: value } : x)); setNotesSaved(false)
+    setNoteBlocks(n => n.map((x, j) => j === i ? ({ ...x, [field]: value } as NoteBlock) : x)); setNotesSaved(false)
   }
   function addNote() {
-    setNoteBlocks(n => [...n, { icon: '', title: '', text: '', link: '', button_label: '' }]); setNotesSaved(false)
+    setNoteBlocks(n => [...n, { id: genCode(), icon: '', title: '', text: '', link: '', button_label: '', priority: 'normal' }]); setNotesSaved(false)
   }
   function removeNoteBlock(i: number) {
     setNoteBlocks(n => n.filter((_, j) => j !== i)); setNotesSaved(false)
@@ -130,11 +136,13 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     const cleaned = noteBlocks
       .filter(n => (n.text ?? '').trim() || (n.title ?? '').trim())
       .map(n => ({
+        id: n.id || genCode(),
         icon: (n.icon ?? '').trim() || undefined,
         title: (n.title ?? '').trim() || undefined,
         text: (n.text ?? '').trim(),
         link: (n.link ?? '').trim() || undefined,
         button_label: (n.button_label ?? '').trim() || undefined,
+        priority: n.priority || 'normal',
       }))
     const { error } = await supabase.from('parties').update({ event_notes: cleaned }).eq('id', partyId)
     if (!error) {
@@ -381,15 +389,26 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
             className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
             style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
-            <span>✏️ Edit invitation copy</span>
+            <span>✏️ Edit invitation</span>
             <span style={{ opacity: 0.5 }}>{showCopyEditor ? '▲' : '▼'}</span>
           </button>
 
           {showCopyEditor && (
             <div className="rounded-2xl p-4 mt-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p className="text-xs mb-4" style={{ color: 'rgba(253,246,227,0.3)' }}>
-                This is the headline and story guests see on the first screen. Type <span style={{ color: 'var(--gold)' }}>{'{name}'}</span> anywhere to drop in each guest's first name.
+                The headline, story, date and time guests see on the invitation. Type <span style={{ color: 'var(--gold)' }}>{'{name}'}</span> anywhere to drop in each guest's first name.
               </p>
+
+              <div className="flex gap-2 mb-4">
+                <div className="flex-1">
+                  <label style={labelStyle}>Date</label>
+                  <input type="date" value={dateDraft} onChange={e => { setDateDraft(e.target.value); setCopySaved(false) }} className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+                </div>
+                <div className="flex-1">
+                  <label style={labelStyle}>Time</label>
+                  <input value={timeDraft} onChange={e => { setTimeDraft(e.target.value); setCopySaved(false) }} placeholder="3:00 PM" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+                </div>
+              </div>
 
               <label style={labelStyle}>Headline</label>
               <textarea
@@ -438,14 +457,14 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
             className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
             style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
-            <span>📝 Captain's Notes ({noteBlocks.length})</span>
+            <span>⚓ Before We Set Sail ({noteBlocks.length})</span>
             <span style={{ opacity: 0.5 }}>{showNotesEditor ? '▲' : '▼'}</span>
           </button>
 
           {showNotesEditor && (
             <div className="rounded-2xl p-4 mt-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p className="text-xs mb-4" style={{ color: 'rgba(253,246,227,0.3)' }}>
-                Little reminders guests see on the final screen — waiver, what to bring, dress code. A note with a link shows as a button.
+                Boarding to-dos guests see before their missions — waiver, what to bring, playlist, dress code. A note with a link shows as a button. Mark the truly important ones Required.
               </p>
 
               <div className="flex flex-col gap-3">
@@ -464,9 +483,21 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                       <input value={n.title ?? ''} onChange={e => updateNote(i, 'title', e.target.value)} placeholder="Title (e.g. Please sign the waiver)" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
                     </div>
                     <textarea value={n.text} onChange={e => updateNote(i, 'text', e.target.value)} rows={2} placeholder="Short description" className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none mb-2" style={inputStyle} />
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-2">
                       <input value={n.link ?? ''} onChange={e => updateNote(i, 'link', e.target.value)} placeholder="https://link (optional)" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
                       <input value={n.button_label ?? ''} onChange={e => updateNote(i, 'button_label', e.target.value)} placeholder="Button text" className="w-28 px-3 py-2 rounded-lg text-sm outline-none" style={inputStyle} />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs" style={{ color: 'rgba(253,246,227,0.3)' }}>Priority:</span>
+                      {(['normal', 'important', 'required'] as const).map(pr => (
+                        <button key={pr} onClick={() => updateNote(i, 'priority', pr)}
+                          className="text-xs px-2.5 py-1 rounded-full transition-all capitalize"
+                          style={(n.priority || 'normal') === pr
+                            ? { background: pr === 'required' ? 'var(--terracotta)' : pr === 'important' ? 'var(--gold)' : 'rgba(255,255,255,0.2)', color: pr === 'important' ? 'var(--navy)' : 'var(--cream)', fontWeight: 700 }
+                            : { background: 'rgba(255,255,255,0.05)', color: 'rgba(253,246,227,0.4)' }}>
+                          {pr}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 ))}
