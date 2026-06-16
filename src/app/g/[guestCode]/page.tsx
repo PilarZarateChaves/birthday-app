@@ -696,12 +696,12 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                       Mission {activeIdx + 1} of {missionList.length} · swipe to flip through
                     </p>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-start gap-1.5">
                       <button onClick={() => goMission(-1, missionList.length)} disabled={activeIdx === 0} aria-label="Previous mission"
                         className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg disabled:opacity-25 transition-all active:scale-90"
-                        style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 14px rgba(45,58,74,0.1)' }}>‹</button>
+                        style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 14px rgba(45,58,74,0.1)', marginTop: 100 }}>‹</button>
 
-                      <div className="flex-1 relative" style={{ minHeight: 250 }}>
+                      <div className="flex-1 relative" style={{ minHeight: 300 }}>
                         <AnimatePresence custom={missionDir} mode="wait">
                           <motion.div key={m.key} custom={missionDir} variants={missionCardVariants}
                             initial="enter" animate="center" exit="exit" transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -715,14 +715,54 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                             <div className="px-5 py-5" style={{ background: m.tint }}>
                               <div className="flex items-center justify-between mb-3">
                                 <span style={{ fontSize: '2rem' }}>{m.icon}</span>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: '#fff', color: m.accent }}>{m.badge} {m.level}</span>
-                                </div>
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: '#fff', color: m.accent }}>{m.badge} {m.level}</span>
                               </div>
-                              <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--riviera-ink)', minHeight: 64 }}>{m.text}</p>
-                              <span className="text-xs font-bold" style={{ color: done ? 'var(--leaf)' : '#c79a3c' }}>
-                                {done ? '✅ Mission accomplished' : '🟡 In progress'}
-                              </span>
+                              <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--riviera-ink)', minHeight: 60 }}>{m.text}</p>
+
+                              {/* completion action — lives inside this mission card */}
+                              <div onPointerDown={e => e.stopPropagation()}>
+                                <button onClick={() => toggleMissionDone(m.key)}
+                                  className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+                                  style={done
+                                    ? { background: 'var(--leaf)', color: '#fff' }
+                                    : { background: '#fff', color: 'var(--leaf)', border: '2px solid var(--leaf)' }}>
+                                  {done ? '✅ Mission Accomplished' : 'Mark this mission accomplished'}
+                                </button>
+
+                                {done && (
+                                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="mt-4">
+                                    <p className="text-sm font-semibold mb-1" style={{ color: 'var(--riviera-ink)' }}>Got proof? We want to see it 😎</p>
+                                    <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Tell future historians what happened. This goes in the memory book.</p>
+
+                                    <textarea
+                                      value={noteDrafts[m.key] ?? ''}
+                                      onChange={e => setNoteDrafts(d => ({ ...d, [m.key]: e.target.value }))}
+                                      onBlur={() => saveMissionNote(m.key)}
+                                      rows={3} placeholder="Tell us what happened…"
+                                      className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none mb-3"
+                                      style={{ background: '#fff', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.12)' }} />
+
+                                    {media.length > 0 && (
+                                      <div className="grid grid-cols-3 gap-2 mb-3">
+                                        {media.map((url, i) => (
+                                          isVideo(url)
+                                            ? <video key={i} src={url} controls className="w-full aspect-square object-cover rounded-xl" />
+                                            : <img key={i} src={url} alt="" className="w-full aspect-square object-cover rounded-xl" />
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    <label className="block">
+                                      <div className="w-full py-3 rounded-2xl font-bold text-sm text-center active:scale-95 transition-all cursor-pointer"
+                                        style={{ background: 'var(--sky-soft)', color: 'var(--sky)' }}>
+                                        {evidenceBusy === m.key ? 'Uploading…' : '📷 Upload photo or video'}
+                                      </div>
+                                      <input type="file" accept="image/*,video/*" className="hidden" disabled={!!evidenceBusy}
+                                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadEvidence(m.key, f) }} />
+                                    </label>
+                                  </motion.div>
+                                )}
+                              </div>
                             </div>
                           </motion.div>
                         </AnimatePresence>
@@ -730,7 +770,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
                       <button onClick={() => goMission(1, missionList.length)} disabled={activeIdx === missionList.length - 1} aria-label="Next mission"
                         className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg disabled:opacity-25 transition-all active:scale-90"
-                        style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 14px rgba(45,58,74,0.1)' }}>›</button>
+                        style={{ background: '#fff', color: 'var(--coral)', boxShadow: '0 4px 14px rgba(45,58,74,0.1)', marginTop: 100 }}>›</button>
                     </div>
 
                     {/* dots */}
@@ -738,49 +778,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                       {missionList.map((mm, i) => (
                         <div key={mm.key} style={{ width: i === activeIdx ? 18 : 6, height: 6, borderRadius: 99, background: i === activeIdx ? 'var(--coral)' : 'rgba(45,58,74,0.16)', transition: 'all 0.3s ease' }} />
                       ))}
-                    </div>
-
-                    {/* progress controls + evidence for the active mission */}
-                    <div className="mt-4 rounded-3xl px-5 py-4" style={{ background: '#fff', boxShadow: '0 6px 22px rgba(45,58,74,0.07)' }}>
-                      <button onClick={() => toggleMissionDone(m.key)}
-                        className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all"
-                        style={done ? { background: 'var(--leaf-soft)', color: 'var(--leaf)' } : { background: 'var(--leaf)', color: '#fff' }}>
-                        {done ? '✅ Accomplished — tap to undo' : 'Mark this mission accomplished'}
-                      </button>
-
-                      {done && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="overflow-hidden">
-                          <p className="text-sm font-semibold mt-4 mb-1" style={{ color: 'var(--riviera-ink)' }}>Got proof? We want to see it 😎</p>
-                          <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Tell future historians what happened. This goes in the memory book.</p>
-
-                          <textarea
-                            value={noteDrafts[m.key] ?? ''}
-                            onChange={e => setNoteDrafts(d => ({ ...d, [m.key]: e.target.value }))}
-                            onBlur={() => saveMissionNote(m.key)}
-                            rows={3} placeholder="Tell us what happened…"
-                            className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none mb-3"
-                            style={{ background: 'var(--riviera-bg)', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.1)' }} />
-
-                          {media.length > 0 && (
-                            <div className="grid grid-cols-3 gap-2 mb-3">
-                              {media.map((url, i) => (
-                                isVideo(url)
-                                  ? <video key={i} src={url} controls className="w-full aspect-square object-cover rounded-xl" />
-                                  : <img key={i} src={url} alt="" className="w-full aspect-square object-cover rounded-xl" />
-                              ))}
-                            </div>
-                          )}
-
-                          <label className="block">
-                            <div className="w-full py-3 rounded-2xl font-bold text-sm text-center active:scale-95 transition-all cursor-pointer"
-                              style={{ background: 'var(--sky-soft)', color: 'var(--sky)' }}>
-                              {evidenceBusy === m.key ? 'Uploading…' : '📷 Upload photo or video'}
-                            </div>
-                            <input type="file" accept="image/*,video/*" className="hidden" disabled={!!evidenceBusy}
-                              onChange={e => { const f = e.target.files?.[0]; if (f) uploadEvidence(m.key, f) }} />
-                          </label>
-                        </motion.div>
-                      )}
                     </div>
                   </div>
                 )
