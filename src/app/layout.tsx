@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "The Royal Gondolieri Society",
-  description: "A secret birthday experience",
+  metadataBase: new URL("https://birthday-app-seven-swart.vercel.app"),
+  title: "You're invited 🚢",
+  description: "A personal birthday boat-day invitation. Tap to open yours.",
 };
 
 export default function RootLayout({
