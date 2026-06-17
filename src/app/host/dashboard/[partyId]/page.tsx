@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import type { Party, Guest, NoteBlock } from '@/types/database'
+import type { Party, Guest, NoteBlock, Newspaper } from '@/types/database'
 import { GONDOLIERI_ROLES } from '@/lib/missions'
 
 function genCode() {
@@ -60,6 +60,10 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [noteBlocks, setNoteBlocks] = useState<NoteBlock[]>([])
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesSaved, setNotesSaved] = useState(false)
+  const [npDraft, setNpDraft] = useState({ headline: '', subheadline: '', quote: '', quote_author: '', captains_log: '', final_note: '', cover_photo: '' })
+  const [npBusy, setNpBusy] = useState(false)
+  const [npSaved, setNpSaved] = useState(false)
+  const [npLinkCopied, setNpLinkCopied] = useState(false)
 
   useEffect(() => {
     if (!localStorage.getItem('host_auth')) { router.replace('/host'); return }
@@ -78,6 +82,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
       setDateDraft(p.party_date ?? '')
       setTimeDraft(p.event_time ?? '')
       setNoteBlocks(Array.isArray(p.event_notes) ? p.event_notes : [])
+      const npx = p.newspaper ?? {}
+      setNpDraft({
+        headline: npx.headline ?? '', subheadline: npx.subheadline ?? '', quote: npx.quote ?? '',
+        quote_author: npx.quote_author ?? '', captains_log: npx.captains_log ?? '', final_note: npx.final_note ?? '',
+        cover_photo: npx.cover_photo ?? '',
+      })
     }
     setGuests((g ?? []).filter((x: Guest) => x.name))
     setLoading(false)
@@ -330,6 +340,41 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     const next = party.status === 'ended' ? 'live' : 'ended'
     await supabase.from('parties').update({ status: next }).eq('id', partyId)
     setParty(p => p ? { ...p, status: next } : p)
+  }
+
+  // ── Birthday newspaper ──
+  async function saveNewspaper(extra?: Partial<Newspaper>) {
+    if (!party || npBusy) return
+    setNpBusy(true); setNpSaved(false)
+    const np: Newspaper = {
+      ...(party.newspaper ?? {}),
+      created: true,
+      headline: npDraft.headline.trim() || undefined,
+      subheadline: npDraft.subheadline.trim() || undefined,
+      quote: npDraft.quote.trim() || undefined,
+      quote_author: npDraft.quote_author.trim() || undefined,
+      captains_log: npDraft.captains_log.trim() || undefined,
+      final_note: npDraft.final_note.trim() || undefined,
+      cover_photo: npDraft.cover_photo.trim() || undefined,
+      ...extra,
+    }
+    const { error } = await supabase.from('parties').update({ newspaper: np }).eq('id', partyId)
+    if (!error) {
+      setParty(p => p ? { ...p, newspaper: np } : p)
+      setNpSaved(true); setTimeout(() => setNpSaved(false), 2500)
+    }
+    setNpBusy(false)
+  }
+
+  async function togglePublish() {
+    if (!party) return
+    await saveNewspaper({ published: !party.newspaper?.published })
+  }
+
+  function copyGiftLink() {
+    navigator.clipboard.writeText(`${window.location.origin}/newspaper/${partyId}`)
+    setNpLinkCopied(true)
+    setTimeout(() => setNpLinkCopied(false), 2000)
   }
 
   async function uploadBirthdayPhoto(file: File) {
@@ -750,14 +795,91 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
           + Add Guest
         </button>
 
-        {/* Newspaper */}
-        <button
-          onClick={() => router.push(`/newspaper/${partyId}`)}
-          className="w-full py-3 rounded-2xl text-sm"
-          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(253,246,227,0.35)', border: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          Generate Birthday Newspaper
-        </button>
+        {/* ── Birthday Newspaper (Isaac's gift) ── */}
+        <div className="rounded-2xl p-4" style={{ background: 'rgba(201,168,76,0.07)', border: '1px solid rgba(201,168,76,0.2)' }}>
+          <p className="text-xs tracking-[0.18em] uppercase mb-1" style={{ color: 'rgba(201,168,76,0.7)' }}>📰 {party?.birthday_person_name}'s Birthday Newspaper</p>
+
+          {!party?.newspaper?.created ? (
+            <>
+              <p className="text-xs mb-4" style={{ color: 'rgba(253,246,227,0.35)' }}>
+                After the party, turn everything — photos, roles, missions, and notes — into one keepsake newspaper for {party?.birthday_person_name}.
+              </p>
+              <button onClick={() => saveNewspaper({ created: true })} disabled={npBusy}
+                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase active:scale-95 transition-all disabled:opacity-50"
+                style={{ background: 'var(--gold)', color: 'var(--navy)' }}>
+                {npBusy ? 'Creating…' : '✨ Create Newspaper'}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs px-2 py-1 rounded-full font-semibold" style={party.newspaper.published ? { background: 'rgba(107,127,94,0.25)', color: '#a8c99a' } : { background: 'rgba(255,255,255,0.08)', color: 'rgba(253,246,227,0.5)' }}>
+                  {party.newspaper.published ? '🟢 Visible to guests' : '🔒 Private (only people with the link)'}
+                </span>
+              </div>
+
+              {/* fields */}
+              <div className="flex flex-col gap-3 mb-4">
+                <div>
+                  <label style={labelStyle}>Headline</label>
+                  <input value={npDraft.headline} onChange={e => { setNpDraft(d => ({ ...d, headline: e.target.value })); setNpSaved(false) }} placeholder={`Captain ${party.birthday_person_name} Takes the Day`} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Subheadline</label>
+                  <input value={npDraft.subheadline} onChange={e => { setNpDraft(d => ({ ...d, subheadline: e.target.value })); setNpSaved(false) }} placeholder="Crew confirms: excellent birthday, questionable navigation…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label style={labelStyle}>Quote of the day</label>
+                    <input value={npDraft.quote} onChange={e => { setNpDraft(d => ({ ...d, quote: e.target.value })); setNpSaved(false) }} placeholder="“Best Sunday of the year.”" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+                  </div>
+                  <div className="w-28">
+                    <label style={labelStyle}>Said by</label>
+                    <input value={npDraft.quote_author} onChange={e => { setNpDraft(d => ({ ...d, quote_author: e.target.value })); setNpSaved(false) }} placeholder="Mao" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Captain's Log (the recap)</label>
+                  <textarea value={npDraft.captains_log} onChange={e => { setNpDraft(d => ({ ...d, captains_log: e.target.value })); setNpSaved(false) }} rows={4} placeholder="Leave blank for a fun default…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Final note to {party.birthday_person_name}</label>
+                  <textarea value={npDraft.final_note} onChange={e => { setNpDraft(d => ({ ...d, final_note: e.target.value })); setNpSaved(false) }} rows={3} placeholder="Your message for the birthday person…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Cover photo</label>
+                  <select value={npDraft.cover_photo} onChange={e => { setNpDraft(d => ({ ...d, cover_photo: e.target.value })); setNpSaved(false) }} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={inputStyle}>
+                    <option value="">{party.birthday_person_name}'s birthday photo (default)</option>
+                    {guests.filter(g => g.photo).map(g => <option key={g.id} value={g.photo!}>{g.name}'s photo</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <button onClick={() => saveNewspaper()} disabled={npBusy}
+                className="w-full py-3 rounded-xl font-semibold text-sm active:scale-95 transition-all disabled:opacity-50 mb-2"
+                style={npSaved ? { background: 'rgba(107,127,94,0.25)', color: '#a8c99a', border: '1px solid rgba(107,127,94,0.4)' } : { background: 'var(--gold)', color: 'var(--navy)' }}>
+                {npBusy ? 'Saving…' : npSaved ? '✓ Saved' : 'Save newspaper'}
+              </button>
+
+              <div className="flex gap-2 mb-2">
+                <button onClick={() => router.push(`/newspaper/${partyId}?host=1`)}
+                  className="flex-1 py-3 rounded-xl text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--cream)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  👁 Preview & hide items
+                </button>
+                <button onClick={copyGiftLink}
+                  className="flex-1 py-3 rounded-xl text-xs font-semibold" style={{ background: 'rgba(201,168,76,0.15)', color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.3)' }}>
+                  {npLinkCopied ? '✓ Copied' : `🎁 Copy ${party.birthday_person_name}'s gift link`}
+                </button>
+              </div>
+
+              <button onClick={togglePublish} disabled={npBusy}
+                className="w-full py-3 rounded-xl font-bold text-sm active:scale-95 transition-all disabled:opacity-50"
+                style={party.newspaper.published ? { background: 'rgba(255,255,255,0.06)', color: 'rgba(253,246,227,0.6)', border: '1px solid rgba(255,255,255,0.1)' } : { background: 'var(--terracotta)', color: 'var(--cream)' }}>
+                {party.newspaper.published ? 'Hide from guests' : '📣 Make visible to guests'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Add Guest Drawer */}

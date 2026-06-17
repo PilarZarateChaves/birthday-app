@@ -33,6 +33,20 @@ export interface EventLink {
   url: string
 }
 
+export interface Newspaper {
+  created?: boolean
+  published?: boolean
+  headline?: string
+  subheadline?: string
+  cover_photo?: string | null
+  quote?: string
+  quote_author?: string
+  captains_log?: string
+  final_note?: string
+  host_photos?: string[]
+  hidden?: string[]
+}
+
 export interface Party {
   id: string
   host_id: string
@@ -49,6 +63,7 @@ export interface Party {
   event_links: EventLink[]
   reveal_titles: boolean
   reveal_missions: boolean
+  newspaper?: Newspaper
   theme: string
   adult_count: number
   kid_count: number

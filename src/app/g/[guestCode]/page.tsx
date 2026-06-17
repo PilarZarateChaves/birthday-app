@@ -1034,7 +1034,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
               })()}
 
               {links.length > 0 && (
-                <div className="flex flex-col gap-2 mb-2">
+                <div className="flex flex-col gap-2 mb-4">
                   {links.map((l, i) => (
                     <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between px-5 py-3.5 rounded-2xl active:scale-95 transition-all"
@@ -1043,6 +1043,49 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                     </a>
                   ))}
                 </div>
+              )}
+
+              {/* ── Birthday note + favorite photo for the newspaper ── */}
+              <div className="rounded-3xl px-5 py-5 mb-4" style={{ background: 'linear-gradient(135deg, var(--blossom), var(--coral-soft))' }}>
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', fontWeight: 700, color: 'var(--riviera-ink)' }}>Leave {bdayName} a birthday note</p>
+                <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink)', opacity: 0.7 }}>One quick message — sweet, funny, dramatic, or all three. It goes in {bdayName}'s birthday newspaper.</p>
+                <textarea value={note} onChange={e => { setNote(e.target.value); setNoteSaved(false) }} rows={3}
+                  placeholder={`Write something for ${bdayName}…`}
+                  className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none"
+                  style={{ background: '#fff', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.1)' }} />
+                <button onClick={saveNote} disabled={saving || !note.trim()}
+                  className="w-full py-3 mt-2.5 rounded-2xl font-bold text-sm active:scale-95 transition-all disabled:opacity-40"
+                  style={{ background: noteSaved ? 'var(--leaf-soft)' : 'var(--coral)', color: noteSaved ? 'var(--leaf)' : '#fff' }}>
+                  {saving ? 'Sending…' : noteSaved ? '✓ Sent to ' + bdayName : 'Send note'}
+                </button>
+
+                <p className="text-sm font-bold mt-4" style={{ color: 'var(--riviera-ink)' }}>Add your favorite photo</p>
+                <p className="text-xs mb-2.5" style={{ color: 'var(--riviera-ink)', opacity: 0.7 }}>Got a good one from the boat? Add it to the newspaper.</p>
+                {photos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-2.5">
+                    {photos.map((p, i) => <img key={i} src={p} alt="" className="w-full aspect-square object-cover rounded-xl" />)}
+                  </div>
+                )}
+                <label className="block">
+                  <div className="w-full py-3 rounded-2xl font-bold text-sm text-center active:scale-95 transition-all cursor-pointer" style={{ background: '#fff', color: 'var(--coral)' }}>
+                    {uploadingPhoto ? 'Uploading…' : '📷 Upload photo'}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f) }} />
+                </label>
+              </div>
+
+              {/* ── Newspaper gate ── */}
+              {party.newspaper?.published ? (
+                <a href={`/newspaper/${party.id}`}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-base active:scale-95 transition-all"
+                  style={{ background: 'var(--gold)', color: 'var(--riviera-ink)', boxShadow: '0 8px 24px rgba(201,168,76,0.45)', textDecoration: 'none' }}>
+                  📰 See the newspaper
+                </a>
+              ) : (
+                <p className="text-center text-xs py-3" style={{ color: 'var(--riviera-ink-soft)' }}>
+                  📰 The Captain's Log will open after the voyage.
+                </p>
               )}
             </motion.div>
           )}
