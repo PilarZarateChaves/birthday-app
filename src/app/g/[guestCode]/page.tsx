@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { Party, Guest, MissionProgress } from '@/types/database'
 
 type Step = 'invitation' | 'role' | 'beforesail' | 'missions' | 'allset' | 'captainslog' | 'declined'
-type CrewMate = { name: string; photo: string | null }
+type CrewMate = { name: string; photo: string | null; role_name: string | null; role_description: string | null }
 
 // ─────────────────────────────────────────────────────────
 // Confetti
@@ -231,11 +231,12 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
   const [crewOpen, setCrewOpen] = useState(true)
+  const [selectedCrew, setSelectedCrew] = useState<CrewMate | null>(null)
   const [prepOpen, setPrepOpen] = useState(true)
   const [prepDone, setPrepDone] = useState<Record<string, boolean>>({})
 
   async function loadCrew(partyId: string) {
-    const { data } = await supabase.from('guests').select('name, photo').eq('party_id', partyId).eq('rsvp_status', 'accepted')
+    const { data } = await supabase.from('guests').select('name, photo, role_name, role_description').eq('party_id', partyId).eq('rsvp_status', 'accepted')
     if (data) setCrew(data as CrewMate[])
   }
 
@@ -724,7 +725,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold" style={{ color: 'var(--riviera-ink)' }}>⚓ Crew Is Boarding</p>
+                      <p className="text-xs font-bold" style={{ color: 'var(--riviera-ink)' }}>⚓ Meet the Crew</p>
                       <p className="text-xs" style={{ color: 'var(--riviera-ink-soft)' }}>{crew.length} crew member{crew.length === 1 ? '' : 's'} confirmed</p>
                     </div>
                     <span style={{ color: 'var(--riviera-ink-soft)', fontSize: 11, opacity: 0.6 }}>{crewOpen ? '⌃' : '⌄'}</span>
@@ -733,22 +734,27 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   <AnimatePresence initial={false}>
                     {crewOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} className="overflow-hidden">
-                        <div className="px-4 pb-6 pt-2 flex flex-wrap justify-center gap-x-3 gap-y-5" style={{ background: 'var(--riviera-bg)' }}>
-                          {crew.map((c, i) => {
-                            const rot = [-5, 4, -3, 6, -6, 3, -2, 5][i % 8]
-                            return (
-                              <motion.div key={i}
-                                initial={{ opacity: 0, y: 12, rotate: 0 }} animate={{ opacity: 1, y: 0, rotate: rot }}
-                                transition={{ duration: 0.4, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-                                style={{ width: 92, background: '#fff', boxShadow: '0 6px 18px rgba(45,58,74,0.18)', borderRadius: 6 }}
-                                className="p-1.5 pb-2.5">
-                                {c.photo
-                                  ? <img src={c.photo} alt="" className="w-full aspect-square object-cover" style={{ borderRadius: 3 }} />
-                                  : <div className="w-full aspect-square flex items-center justify-center" style={{ borderRadius: 3, background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '1.8rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{c.name?.[0] ?? '⚓'}</div>}
-                                <p className="text-center mt-1.5" style={{ fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--riviera-ink)' }}>{c.name?.split(' ')[0]}</p>
-                              </motion.div>
-                            )
-                          })}
+                        <div className="px-4 pb-6 pt-1" style={{ background: 'var(--riviera-bg)' }}>
+                          <p className="text-xs leading-relaxed text-center mb-4 px-2" style={{ color: 'var(--riviera-ink-soft)' }}>
+                            Tap a card to reveal their official role. And keep an eye out during the voyage… someone may be acting suspiciously because of a secret mission 🕵️
+                          </p>
+                          <div className="flex flex-wrap justify-center gap-x-3 gap-y-5">
+                            {crew.map((c, i) => {
+                              const rot = [-5, 4, -3, 6, -6, 3, -2, 5][i % 8]
+                              return (
+                                <motion.button key={i} onClick={() => setSelectedCrew(c)}
+                                  initial={{ opacity: 0, y: 12, rotate: 0 }} animate={{ opacity: 1, y: 0, rotate: rot }} whileTap={{ scale: 0.94, rotate: 0 }}
+                                  transition={{ duration: 0.4, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                                  style={{ width: 92, background: '#fff', boxShadow: '0 6px 18px rgba(45,58,74,0.18)', borderRadius: 6 }}
+                                  className="p-1.5 pb-2.5 cursor-pointer">
+                                  {c.photo
+                                    ? <img src={c.photo} alt="" className="w-full aspect-square object-cover" style={{ borderRadius: 3 }} />
+                                    : <div className="w-full aspect-square flex items-center justify-center" style={{ borderRadius: 3, background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '1.8rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{c.name?.[0] ?? '⚓'}</div>}
+                                  <p className="text-center mt-1.5" style={{ fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--riviera-ink)' }}>{c.name?.split(' ')[0]}</p>
+                                </motion.button>
+                              )
+                            })}
+                          </div>
                         </div>
                       </motion.div>
                     )}
@@ -1146,6 +1152,75 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
         </motion.p>
 
       </div>
+
+      {/* ── COLLECTIBLE CREW CARD MODAL ── */}
+      <AnimatePresence>
+        {selectedCrew && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center px-6"
+            style={{ background: 'rgba(26,39,68,0.55)', backdropFilter: 'blur(3px)' }}
+            onClick={() => setSelectedCrew(null)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, rotateY: 25, y: 20 }}
+              animate={{ opacity: 1, scale: 1, rotateY: 0, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              onClick={e => e.stopPropagation()}
+              className="relative w-full rounded-[1.75rem] overflow-hidden"
+              style={{ maxWidth: 320, background: '#fff', boxShadow: '0 30px 70px rgba(26,39,68,0.45)', transformPerspective: 1000 }}>
+
+              <button onClick={() => setSelectedCrew(null)} aria-label="Close"
+                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center text-base"
+                style={{ background: 'rgba(255,255,255,0.85)', color: 'var(--riviera-ink)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>×</button>
+
+              {/* ticket strip */}
+              <div className="py-2 text-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))' }}>
+                <p style={{ fontSize: '0.6rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#fff', fontWeight: 700 }}>⚓ Official Crew Card</p>
+              </div>
+
+              {/* photo — large, centered, first */}
+              <div className="px-6 pt-6">
+                <div className="rounded-[1.4rem] overflow-hidden mx-auto relative" style={{ border: '5px solid #fff', boxShadow: '0 12px 30px rgba(45,58,74,0.2)', ...(selectedCrew.photo ? {} : { aspectRatio: '9 / 10' }) }}>
+                  {selectedCrew.photo
+                    ? <img src={selectedCrew.photo} alt={selectedCrew.name} className="w-full" style={{ display: 'block', height: 'auto' }} />
+                    : <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sunny), var(--coral))', color: '#fff', fontSize: '4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{selectedCrew.name?.[0] ?? '⚓'}</div>}
+                  <PhotoWaves />
+                </div>
+              </div>
+
+              {/* legend — name + role under the photo */}
+              <div className="px-6 pt-4 pb-6 text-center">
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.45rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.15 }}>
+                  {selectedCrew.name?.split(' ')[0]}
+                </p>
+
+                {selectedCrew.role_name && (
+                  <>
+                    <p style={{ fontSize: '0.58rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--coral)', marginTop: '0.7rem', opacity: 0.8 }}>
+                      Official crew role
+                    </p>
+                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', fontWeight: 700, color: 'var(--coral)', lineHeight: 1.25, marginTop: '0.15rem' }}>
+                      {selectedCrew.role_name}
+                    </p>
+                    {selectedCrew.role_description && (
+                      <p className="text-sm leading-relaxed mt-2" style={{ color: 'var(--riviera-ink-soft)' }}>
+                        {selectedCrew.role_description}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {/* playful clue — never reveals the actual mission */}
+                <div className="mt-4 rounded-2xl px-4 py-3" style={{ background: 'var(--sunny-soft)', border: '1px dashed rgba(201,168,76,0.5)' }}>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--riviera-ink)' }}>
+                    🕵️ Keep an eye on them. Can you guess their secret mission?
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }
