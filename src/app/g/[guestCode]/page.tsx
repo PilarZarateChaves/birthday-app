@@ -1245,11 +1245,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                     <p style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', fontWeight: 700, color: 'var(--coral)', lineHeight: 1.25, marginTop: '0.15rem' }}>
                       {selectedCrew.role_name}
                     </p>
-                    {selectedCrew.role_description && (
-                      <p className="text-sm leading-relaxed mt-2" style={{ color: 'var(--riviera-ink-soft)' }}>
-                        {selectedCrew.role_description}
-                      </p>
-                    )}
                   </>
                 )}
               </div>
