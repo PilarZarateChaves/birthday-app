@@ -52,6 +52,39 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
     setParty(p => p ? { ...p, newspaper: np } : p)
   }
 
+  const [uploadingHostPhoto, setUploadingHostPhoto] = useState(false)
+  async function uploadHostPhotos(files: FileList) {
+    if (!party || uploadingHostPhoto || !files.length) return
+    setUploadingHostPhoto(true)
+    const np0: Newspaper = party.newspaper ?? {}
+    const existing = Array.isArray(np0.host_photos) ? np0.host_photos : []
+    const added: string[] = []
+    const list = Array.from(files)
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i]
+      const ext = (f.name.split('.').pop() || 'jpg').toLowerCase()
+      const path = `newspaper/${partyId}/${Date.now()}-${i}.${ext}`
+      const { error } = await supabase.storage.from('party-media').upload(path, f, { upsert: true })
+      if (!error) { const { data } = supabase.storage.from('party-media').getPublicUrl(path); added.push(data.publicUrl) }
+    }
+    const np = { ...np0, host_photos: [...existing, ...added] }
+    const { error: upErr } = await supabase.from('parties').update({ newspaper: np }).eq('id', partyId)
+    if (!upErr) setParty(p => p ? { ...p, newspaper: np } : p)
+    else alert('Couldn\'t save photos. Run the one-line "newspaper" column SQL Pili gave you, then try again.')
+    setUploadingHostPhoto(false)
+  }
+  async function removeHostPhoto(url: string) {
+    if (!party) return
+    const np0: Newspaper = party.newspaper ?? {}
+    const existing = Array.isArray(np0.host_photos) ? np0.host_photos : []
+    const np = { ...np0, host_photos: existing.filter(u => u !== url) }
+    await supabase.from('parties').update({ newspaper: np }).eq('id', partyId)
+    setParty(p => p ? { ...p, newspaper: np } : p)
+    const marker = '/party-media/'
+    const idx = url.indexOf(marker)
+    if (idx >= 0) supabase.storage.from('party-media').remove([url.slice(idx + marker.length)])
+  }
+
   if (loading) return (
     <main className="min-h-screen flex items-center justify-center" style={{ background: PAPER }}>
       <p style={{ color: INK, opacity: 0.4, fontFamily: serif, fontStyle: 'italic' }}>Printing the morning edition…</p>
@@ -84,14 +117,15 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
     .map(g => ({ key: `note:${g.id}`, name: g.name.split(' ')[0], text: g.memory_favorite_moment! }))
     .filter(n => show(n.key))
   const photos: { url: string; name: string }[] = []
+  ;(np.host_photos ?? []).forEach(u => photos.push({ url: u, name: 'The host' }))
   guests.forEach(g => {
     const first = g.name.split(' ')[0]
     ;(Array.isArray(g.memory_photos) ? g.memory_photos : []).forEach(u => photos.push({ url: u, name: first }))
     const mp = g.mission_progress ?? {}
     Object.values(mp).forEach(e => (e?.media ?? []).forEach(u => photos.push({ url: u, name: first })))
   })
-  ;(np.host_photos ?? []).forEach(u => photos.push({ url: u, name: 'The host' }))
   const visiblePhotos = photos.filter(p => show(p.url))
+  const hostPhotoSet = new Set(np.host_photos ?? [])
 
   const Rule = ({ thick }: { thick?: boolean }) => <div style={{ borderTop: `${thick ? 3 : 1}px solid ${INK}` }} />
   const HideBtn = ({ k }: { k: string }) => hostMode ? (
@@ -225,22 +259,48 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
         )}
 
         {/* ── PHOTO PAGE ── */}
-        {visiblePhotos.length > 0 && (
+        {(visiblePhotos.length > 0 || hostMode) && (
           <div className="pt-7">
             <SectionHead title="From the Voyage" />
-            <div className="grid grid-cols-2 gap-3">
-              {visiblePhotos.map((p, i) => (
-                <figure key={i} className="relative" style={{ transform: `rotate(${[-1.5, 1.2, -0.8, 1.6][i % 4]}deg)` }}>
-                  <HideBtn k={p.url} />
-                  <div style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
-                    {isVideo(p.url)
-                      ? <video src={p.url} controls className="w-full aspect-square object-cover" style={{ display: 'block' }} />
-                      : <img src={p.url} alt="" className="w-full aspect-square object-cover" style={{ display: 'block', filter: 'saturate(0.95)' }} />}
+
+            {hostMode && (
+              <div className="mb-4">
+                <label className="block">
+                  <div className="w-full py-3 rounded text-center text-sm font-bold cursor-pointer active:scale-95 transition-all"
+                    style={{ background: INK, color: PAPER }}>
+                    {uploadingHostPhoto ? 'Uploading…' : '📷 Upload your best photos'}
                   </div>
-                  <figcaption className="text-xs italic mt-1" style={{ color: INK_SOFT }}>📷 {p.name}</figcaption>
-                </figure>
-              ))}
-            </div>
+                  <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={uploadingHostPhoto}
+                    onChange={e => { if (e.target.files && e.target.files.length) uploadHostPhotos(e.target.files); e.currentTarget.value = '' }} />
+                </label>
+                <p className="text-xs italic mt-1.5 text-center" style={{ color: INK_SOFT }}>
+                  Your uploads show first. Guest photos appear below — tap “hide” on any you don’t want.
+                </p>
+              </div>
+            )}
+
+            {visiblePhotos.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                {visiblePhotos.map((p, i) => {
+                  const isHostPhoto = hostPhotoSet.has(p.url)
+                  return (
+                    <figure key={i} className="relative" style={{ transform: `rotate(${[-1.5, 1.2, -0.8, 1.6][i % 4]}deg)` }}>
+                      {hostMode && isHostPhoto ? (
+                        <button onClick={() => removeHostPhoto(p.url)} className="absolute top-1 right-1 z-10 px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: '#c4622d', color: '#fff' }}>remove</button>
+                      ) : (
+                        <HideBtn k={p.url} />
+                      )}
+                      <div style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
+                        {isVideo(p.url)
+                          ? <video src={p.url} controls className="w-full aspect-square object-cover" style={{ display: 'block' }} />
+                          : <img src={p.url} alt="" className="w-full aspect-square object-cover" style={{ display: 'block', filter: 'saturate(0.95)' }} />}
+                      </div>
+                      <figcaption className="text-xs italic mt-1" style={{ color: INK_SOFT }}>📷 {isHostPhoto ? 'Captain’s pick' : p.name}</figcaption>
+                    </figure>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
