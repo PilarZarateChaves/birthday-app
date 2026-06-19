@@ -113,6 +113,8 @@ export interface Guest {
   prep_progress: Record<string, boolean>
   mission_alts: Record<string, string[]>
   mission_swapped: Record<string, boolean>
+  mission_base: Record<string, string>
+  mission_locked: Record<string, boolean>
   invite_code: string | null
   is_host: boolean
   created_at: string

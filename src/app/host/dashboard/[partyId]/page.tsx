@@ -291,6 +291,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
           patch.mission_easy = newGuest.mission_easy.trim() || null
           patch.mission_medium = newGuest.mission_medium.trim() || null
           patch.mission_legendary = newGuest.mission_legendary.trim() || null
+          patch.mission_base = { easy: newGuest.mission_easy.trim(), medium: newGuest.mission_medium.trim(), legendary: newGuest.mission_legendary.trim() }
         }
         patch.mission_alts = cleanedAlts
         if (photoUrl) patch.photo = photoUrl
@@ -318,6 +319,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
           mission_medium: newGuest.mission_medium || null,
           mission_legendary: newGuest.mission_legendary || null,
           mission_alts: cleanedAlts,
+          mission_base: { easy: newGuest.mission_easy.trim(), medium: newGuest.mission_medium.trim(), legendary: newGuest.mission_legendary.trim() },
           mission_status: 'in_progress',
           rsvp_status: 'pending',
           mission_accepted: false,
@@ -784,6 +786,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                               <p className="text-xs leading-snug" style={{ color: 'rgba(253,246,227,0.6)' }}>
                                 <span style={{ color: 'rgba(253,246,227,0.35)' }}>{t.label.split(' ')[1]}:</span> {guest[t.field]}
                                 {guest.mission_swapped?.[t.key] && <span className="ml-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold" style={{ background: 'rgba(201,168,76,0.18)', color: 'var(--gold)' }}>🎲 Swapped</span>}
+                                {guest.mission_locked?.[t.key] && <span className="ml-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold" style={{ background: 'rgba(107,190,94,0.18)', color: '#a8c99a' }}>✅ Accepted</span>}
                               </p>
                             </div>
                             {e.note && (

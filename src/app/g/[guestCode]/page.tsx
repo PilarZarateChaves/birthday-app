@@ -230,7 +230,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [evidenceBusy, setEvidenceBusy] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
-  const [swapKey, setSwapKey] = useState<string | null>(null)
   const [swapFlash, setSwapFlash] = useState<Record<string, boolean>>({})
   const [crewOpen, setCrewOpen] = useState(true)
   const [selectedCrew, setSelectedCrew] = useState<CrewMate | null>(null)
@@ -383,18 +382,40 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
     setActiveMission(i => Math.min(count - 1, Math.max(0, i + dir)))
   }
 
-  async function swapMission(key: string, text: string) {
+  function swapPool(key: string): string[] {
+    if (!guest) return []
+    const base = guest.mission_base?.[key]
+    const alts = guest.mission_alts?.[key] ?? []
+    const cur = (guest as unknown as Record<string, string>)[`mission_${key}`]
+    return [...new Set([base, ...alts, cur].filter(Boolean))] as string[]
+  }
+
+  async function swapMission(key: string) {
     if (!guest) return
     const field = `mission_${key}` as 'mission_easy' | 'mission_medium' | 'mission_legendary'
-    const nextSwapped = { ...(guest.mission_swapped ?? {}), [key]: true }
-    const nextProgress = { ...progress, [key]: {} }
-    setGuest(g => g ? { ...g, [field]: text, mission_swapped: nextSwapped } : g)
-    setProgress(nextProgress)
-    setNoteDrafts(d => ({ ...d, [key]: '' }))
-    setSwapKey(null)
+    const pool = swapPool(key)
+    if (pool.length < 2) return
+    const cur = (guest as unknown as Record<string, string>)[field]
+    const next = pool[(Math.max(0, pool.indexOf(cur)) + 1) % pool.length]
+    const nextSwapped = { ...(guest.mission_swapped ?? {}), [key]: next !== guest.mission_base?.[key] }
+    setGuest(g => g ? { ...g, [field]: next, mission_swapped: nextSwapped } : g)
     setSwapFlash(f => ({ ...f, [key]: true }))
-    setTimeout(() => setSwapFlash(f => ({ ...f, [key]: false })), 2600)
-    await supabase.from('guests').update({ [field]: text, mission_swapped: nextSwapped, mission_progress: nextProgress }).eq('id', guest.id)
+    setTimeout(() => setSwapFlash(f => ({ ...f, [key]: false })), 1800)
+    await supabase.from('guests').update({ [field]: next, mission_swapped: nextSwapped }).eq('id', guest.id)
+  }
+
+  async function acceptMission(key: string) {
+    if (!guest) return
+    const next = { ...(guest.mission_locked ?? {}), [key]: true }
+    setGuest(g => g ? { ...g, mission_locked: next } : g)
+    await supabase.from('guests').update({ mission_locked: next }).eq('id', guest.id)
+  }
+
+  async function unlockMission(key: string) {
+    if (!guest) return
+    const next = { ...(guest.mission_locked ?? {}), [key]: false }
+    setGuest(g => g ? { ...g, mission_locked: next } : g)
+    await supabase.from('guests').update({ mission_locked: next }).eq('id', guest.id)
   }
 
   async function togglePrep(id: string) {
@@ -901,6 +922,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                 const photoCount = media.filter(u => !isVideo(u)).length
                 const videoCount = media.filter(isVideo).length
                 const hasStory = !!(p.note && p.note.trim())
+                const locked = !!guest.mission_locked?.[m.key]
+                const canSwap = swapPool(m.key).length > 1
                 return (
                   <motion.div className="mb-7" initial={{ rotateY: 80, opacity: 0, scale: 0.92 }} animate={{ rotateY: 0, opacity: 1, scale: 1 }} transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }} style={{ transformPerspective: 1000 }}>
                     <p className="text-center mb-1" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--riviera-ink)' }}>
@@ -933,33 +956,36 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                               </div>
                               <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--riviera-ink)', minHeight: 60 }}>{m.text}</p>
 
-                              {swapKey === m.key ? (
-                                <div onPointerDown={e => e.stopPropagation()}>
-                                  <p className="text-sm font-bold mb-1" style={{ color: 'var(--riviera-ink)' }}>Pick another one 🎲</p>
-                                  <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Misma onda {m.level.toLowerCase()} — elige la que va más contigo.</p>
-                                  <div className="flex flex-col gap-2">
-                                    {(guest.mission_alts?.[m.key] ?? []).map((alt, ai) => (
-                                      <button key={ai} onClick={() => swapMission(m.key, alt)}
-                                        className="w-full text-left px-4 py-3 rounded-2xl text-sm active:scale-[0.98] transition-all"
-                                        style={{ background: '#fff', border: alt === m.text ? `1.5px solid ${m.accent}` : '1px solid rgba(45,58,74,0.12)', color: 'var(--riviera-ink)' }}>
-                                        {alt}{alt === m.text ? '  ·  (la de ahora)' : ''}
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <button onClick={() => setSwapKey(null)} className="w-full mt-3 py-2 text-xs font-semibold" style={{ color: 'var(--riviera-ink-soft)' }}>
-                                    Mejor dejo esta
-                                  </button>
-                                </div>
-                              ) : (
-                              <>
                               {swapFlash[m.key] && (
-                                <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="text-sm font-bold mb-3 text-center" style={{ color: 'var(--leaf)' }}>
-                                  🎲 Listo. Esta va más contigo.
+                                <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="text-xs font-bold mb-2 text-center" style={{ color: 'var(--leaf)' }}>
+                                  🎲 Nueva misión — ¿esta te late más?
                                 </motion.p>
                               )}
 
-                              {/* completion + memory capture — lives inside this mission card */}
+                              {/* ── CHOOSE & ACCEPT (before lock) ── */}
+                              {!locked ? (
+                                <div onPointerDown={e => e.stopPropagation()}>
+                                  {canSwap && !missionsClosed && (
+                                    <button onClick={() => swapMission(m.key)}
+                                      className="w-full mb-2 py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all"
+                                      style={{ background: 'rgba(45,58,74,0.05)', color: 'var(--riviera-ink-soft)' }}>
+                                      🎲 Swap — muéstrame otra
+                                    </button>
+                                  )}
+                                  <button onClick={() => acceptMission(m.key)}
+                                    className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+                                    style={{ background: 'var(--leaf)', color: '#fff' }}>
+                                    Aceptar esta misión ✋
+                                  </button>
+                                </div>
+                              ) : (
                               <div onPointerDown={e => e.stopPropagation()}>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-bold" style={{ color: 'var(--leaf)' }}>✅ Misión aceptada</p>
+                                {canSwap && !done && !missionsClosed && (
+                                  <button onClick={() => unlockMission(m.key)} className="text-xs font-semibold" style={{ color: 'var(--riviera-ink-soft)' }}>🎲 Cambiar</button>
+                                )}
+                              </div>
 
                                 {/* STATE 1 — not complete */}
                                 {!done && (
@@ -1051,15 +1077,6 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                                   </motion.div>
                                 )}
                               </div>
-
-                              {(guest.mission_alts?.[m.key]?.length ?? 0) > 0 && !missionsClosed && (
-                                <button onPointerDown={e => e.stopPropagation()} onClick={() => { setSwapKey(m.key); setExpanded(e => ({ ...e, [m.key]: false })) }}
-                                  className="w-full mt-3 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
-                                  style={{ background: 'rgba(45,58,74,0.05)', color: 'var(--riviera-ink-soft)' }}>
-                                  🎲 No es mi vibe — cambiar misión
-                                </button>
-                              )}
-                              </>
                               )}
                             </div>
                           </motion.div>
