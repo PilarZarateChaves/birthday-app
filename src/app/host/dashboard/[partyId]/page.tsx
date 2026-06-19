@@ -291,8 +291,13 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
           patch.mission_easy = newGuest.mission_easy.trim() || null
           patch.mission_medium = newGuest.mission_medium.trim() || null
           patch.mission_legendary = newGuest.mission_legendary.trim() || null
-          patch.mission_base = { easy: newGuest.mission_easy.trim(), medium: newGuest.mission_medium.trim(), legendary: newGuest.mission_legendary.trim() }
         }
+        // Keep a stable base (the original of each tier) so the swap loop always
+        // includes it. Preserve an existing base; otherwise capture the current.
+        const existingBase = target?.mission_base
+        patch.mission_base = (existingBase && Object.keys(existingBase).length)
+          ? existingBase
+          : { easy: newGuest.mission_easy.trim(), medium: newGuest.mission_medium.trim(), legendary: newGuest.mission_legendary.trim() }
         patch.mission_alts = cleanedAlts
         if (photoUrl) patch.photo = photoUrl
         const { error } = await supabase.from('guests').update(patch).eq('id', editingGuestId)
