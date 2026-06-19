@@ -734,10 +734,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                   <AnimatePresence initial={false}>
                     {crewOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} className="overflow-hidden">
-                        <div className="px-4 pb-6 pt-1" style={{ background: 'var(--riviera-bg)' }}>
-                          <p className="text-xs leading-relaxed text-center mb-4 px-2" style={{ color: 'var(--riviera-ink-soft)' }}>
-                            Tap a card to reveal their official boat-day role ⚓
-                          </p>
+                        <div className="px-4 pb-6 pt-3" style={{ background: 'var(--riviera-bg)' }}>
                           <div className="flex flex-wrap justify-center gap-x-3 gap-y-5">
                             {crew.map((c, i) => {
                               const rot = [-5, 4, -3, 6, -6, 3, -2, 5][i % 8]
