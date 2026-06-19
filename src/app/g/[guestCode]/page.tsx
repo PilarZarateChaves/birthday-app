@@ -230,6 +230,8 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   const [evidenceBusy, setEvidenceBusy] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
+  const [swapKey, setSwapKey] = useState<string | null>(null)
+  const [swapFlash, setSwapFlash] = useState<Record<string, boolean>>({})
   const [crewOpen, setCrewOpen] = useState(true)
   const [selectedCrew, setSelectedCrew] = useState<CrewMate | null>(null)
   const [prepOpen, setPrepOpen] = useState(true)
@@ -379,6 +381,20 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
   function goMission(dir: number, count: number) {
     setMissionDir(dir)
     setActiveMission(i => Math.min(count - 1, Math.max(0, i + dir)))
+  }
+
+  async function swapMission(key: string, text: string) {
+    if (!guest) return
+    const field = `mission_${key}` as 'mission_easy' | 'mission_medium' | 'mission_legendary'
+    const nextSwapped = { ...(guest.mission_swapped ?? {}), [key]: true }
+    const nextProgress = { ...progress, [key]: {} }
+    setGuest(g => g ? { ...g, [field]: text, mission_swapped: nextSwapped } : g)
+    setProgress(nextProgress)
+    setNoteDrafts(d => ({ ...d, [key]: '' }))
+    setSwapKey(null)
+    setSwapFlash(f => ({ ...f, [key]: true }))
+    setTimeout(() => setSwapFlash(f => ({ ...f, [key]: false })), 2600)
+    await supabase.from('guests').update({ [field]: text, mission_swapped: nextSwapped, mission_progress: nextProgress }).eq('id', guest.id)
   }
 
   async function togglePrep(id: string) {
@@ -917,6 +933,31 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                               </div>
                               <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--riviera-ink)', minHeight: 60 }}>{m.text}</p>
 
+                              {swapKey === m.key ? (
+                                <div onPointerDown={e => e.stopPropagation()}>
+                                  <p className="text-sm font-bold mb-1" style={{ color: 'var(--riviera-ink)' }}>Pick another one 🎲</p>
+                                  <p className="text-xs mb-3" style={{ color: 'var(--riviera-ink-soft)' }}>Misma onda {m.level.toLowerCase()} — elige la que va más contigo.</p>
+                                  <div className="flex flex-col gap-2">
+                                    {(guest.mission_alts?.[m.key] ?? []).map((alt, ai) => (
+                                      <button key={ai} onClick={() => swapMission(m.key, alt)}
+                                        className="w-full text-left px-4 py-3 rounded-2xl text-sm active:scale-[0.98] transition-all"
+                                        style={{ background: '#fff', border: alt === m.text ? `1.5px solid ${m.accent}` : '1px solid rgba(45,58,74,0.12)', color: 'var(--riviera-ink)' }}>
+                                        {alt}{alt === m.text ? '  ·  (la de ahora)' : ''}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button onClick={() => setSwapKey(null)} className="w-full mt-3 py-2 text-xs font-semibold" style={{ color: 'var(--riviera-ink-soft)' }}>
+                                    Mejor dejo esta
+                                  </button>
+                                </div>
+                              ) : (
+                              <>
+                              {swapFlash[m.key] && (
+                                <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="text-sm font-bold mb-3 text-center" style={{ color: 'var(--leaf)' }}>
+                                  🎲 Listo. Esta va más contigo.
+                                </motion.p>
+                              )}
+
                               {/* completion + memory capture — lives inside this mission card */}
                               <div onPointerDown={e => e.stopPropagation()}>
 
@@ -1010,6 +1051,16 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                                   </motion.div>
                                 )}
                               </div>
+
+                              {(guest.mission_alts?.[m.key]?.length ?? 0) > 0 && !missionsClosed && (
+                                <button onPointerDown={e => e.stopPropagation()} onClick={() => { setSwapKey(m.key); setExpanded(e => ({ ...e, [m.key]: false })) }}
+                                  className="w-full mt-3 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
+                                  style={{ background: 'rgba(45,58,74,0.05)', color: 'var(--riviera-ink-soft)' }}>
+                                  🎲 No es mi vibe — cambiar misión
+                                </button>
+                              )}
+                              </>
+                              )}
                             </div>
                           </motion.div>
                         </AnimatePresence>

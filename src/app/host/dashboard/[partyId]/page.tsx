@@ -41,6 +41,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   })
   const [selectedTemplate, setSelectedTemplate] = useState(-1)
   const [editingGuestId, setEditingGuestId] = useState<string | null>(null)
+  const [altsDraft, setAltsDraft] = useState<{ easy: string[]; medium: string[]; legendary: string[] }>({ easy: [], medium: [], legendary: [] })
   const [addingGuest, setAddingGuest] = useState(false)
   const [addError, setAddError] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -211,6 +212,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     setSelectedTemplate(idx)
   }
 
+  const EMPTY_ALTS = { easy: [] as string[], medium: [] as string[], legendary: [] as string[] }
+  type AltTier = 'easy' | 'medium' | 'legendary'
+  function addAlt(tier: AltTier) { setAltsDraft(a => ({ ...a, [tier]: [...a[tier], ''] })) }
+  function updateAlt(tier: AltTier, i: number, v: string) { setAltsDraft(a => ({ ...a, [tier]: a[tier].map((x, j) => j === i ? v : x) })) }
+  function removeAlt(tier: AltTier, i: number) { setAltsDraft(a => ({ ...a, [tier]: a[tier].filter((_, j) => j !== i) })) }
+
   function startEditGuest(guest: Guest) {
     setEditingGuestId(guest.id)
     setNewGuest({
@@ -221,6 +228,8 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
       mission_medium: guest.mission_medium ?? '',
       mission_legendary: guest.mission_legendary ?? '',
     })
+    const a = guest.mission_alts ?? {}
+    setAltsDraft({ easy: a.easy ?? [], medium: a.medium ?? [], legendary: a.legendary ?? [] })
     setSelectedTemplate(-1)
     setPhotoFile(null)
     setPhotoPreview(guest.photo ?? '')
@@ -233,6 +242,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     setShowAddGuest(false)
     setEditingGuestId(null)
     setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' })
+    setAltsDraft(EMPTY_ALTS)
     setPhotoFile(null)
     setPhotoPreview('')
     setSelectedTemplate(-1)
@@ -243,6 +253,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     if (!newGuest.name.trim() || addingGuest) return
     setAddingGuest(true)
     setAddError('')
+
+    const cleanedAlts = {
+      easy: altsDraft.easy.map(s => s.trim()).filter(Boolean),
+      medium: altsDraft.medium.map(s => s.trim()).filter(Boolean),
+      legendary: altsDraft.legendary.map(s => s.trim()).filter(Boolean),
+    }
 
     try {
       let photoUrl = ''
@@ -276,6 +292,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
           patch.mission_medium = newGuest.mission_medium.trim() || null
           patch.mission_legendary = newGuest.mission_legendary.trim() || null
         }
+        patch.mission_alts = cleanedAlts
         if (photoUrl) patch.photo = photoUrl
         const { error } = await supabase.from('guests').update(patch).eq('id', editingGuestId)
         if (error) {
@@ -300,6 +317,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
           mission_easy: newGuest.mission_easy || null,
           mission_medium: newGuest.mission_medium || null,
           mission_legendary: newGuest.mission_legendary || null,
+          mission_alts: cleanedAlts,
           mission_status: 'in_progress',
           rsvp_status: 'pending',
           mission_accepted: false,
@@ -765,6 +783,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                               <span className="text-xs flex-shrink-0">{e.done ? '✅' : '🟡'}</span>
                               <p className="text-xs leading-snug" style={{ color: 'rgba(253,246,227,0.6)' }}>
                                 <span style={{ color: 'rgba(253,246,227,0.35)' }}>{t.label.split(' ')[1]}:</span> {guest[t.field]}
+                                {guest.mission_swapped?.[t.key] && <span className="ml-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold" style={{ background: 'rgba(201,168,76,0.18)', color: 'var(--gold)' }}>🎲 Swapped</span>}
                               </p>
                             </div>
                             {e.note && (
@@ -812,7 +831,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
         {/* Add guest button */}
         <button
-          onClick={() => { setEditingGuestId(null); setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' }); setPhotoFile(null); setPhotoPreview(''); setSelectedTemplate(-1); setAddError(''); setShowAddGuest(true) }}
+          onClick={() => { setEditingGuestId(null); setNewGuest({ name: '', role_name: '', role_description: '', mission_easy: '', mission_medium: '', mission_legendary: '' }); setAltsDraft(EMPTY_ALTS); setPhotoFile(null); setPhotoPreview(''); setSelectedTemplate(-1); setAddError(''); setShowAddGuest(true) }}
           className="w-full py-4 rounded-2xl text-sm font-semibold tracking-widest uppercase active:scale-95 transition-all mb-6"
           style={{ background: 'var(--gold)', color: 'var(--navy)' }}
         >
@@ -1029,6 +1048,30 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   <label style={labelStyle}>🔥 Legendary mission</label>
                   <textarea value={newGuest.mission_legendary} disabled={missionsLocked} onChange={e => setNewGuest(g => ({ ...g, mission_legendary: e.target.value }))} rows={2} placeholder="Help create a group photo that actually looks fun…" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none disabled:opacity-50" style={inputStyle} />
                 </div>
+              </div>
+
+              {/* Alternate missions (the guest can swap to one of these) */}
+              <div className="rounded-xl p-3 mb-5" style={{ background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'rgba(201,168,76,0.7)' }}>🎲 Misiones alternativas (para que el invitado pueda cambiar)</p>
+                <p className="text-[0.65rem] mb-3" style={{ color: 'rgba(253,246,227,0.3)' }}>
+                  Agrega 3–5 opciones por nivel, fieles a su rol. El invitado solo puede cambiar dentro del mismo nivel.
+                </p>
+                {([['easy', '🟢 Easy'], ['medium', '🟡 Medium'], ['legendary', '🔥 Legendary']] as const).map(([tier, label]) => (
+                  <div key={tier} className="mb-3">
+                    <label style={labelStyle}>{label}</label>
+                    <div className="flex flex-col gap-1.5">
+                      {altsDraft[tier].map((alt, i) => (
+                        <div key={i} className="flex gap-1.5 items-start">
+                          <textarea value={alt} onChange={e => updateAlt(tier, i, e.target.value)} rows={2} placeholder="Otra misión del mismo estilo…" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none resize-none" style={inputStyle} />
+                          <button type="button" onClick={() => removeAlt(tier, i)} className="w-7 h-7 rounded-lg text-xs flex-shrink-0 mt-0.5" style={{ background: 'rgba(196,98,45,0.18)', color: '#f0a07a' }}>×</button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => addAlt(tier)} className="text-xs py-1.5 rounded-lg" style={{ color: 'rgba(201,168,76,0.7)', background: 'rgba(201,168,76,0.06)', border: '1px dashed rgba(201,168,76,0.25)' }}>
+                        + Agregar opción {label}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {addError && (
