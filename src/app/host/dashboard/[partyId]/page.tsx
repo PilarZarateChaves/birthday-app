@@ -132,15 +132,15 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
   async function sendBirthdayEmail() {
     if (!party || sendingEmail) return
-    if (!party.birthday_person_email) { setEmailResult('Primero agrega y guarda el email del cumpleañero arriba.'); return }
-    if (!confirm(`¿Enviar el correo de cumpleaños a ${party.birthday_person_name} (${party.birthday_person_email})? Esto le manda el correo de verdad.`)) return
+    if (!party.birthday_person_email) { setEmailResult('First add and save the birthday person\'s email above.'); return }
+    if (!confirm(`Send the birthday email to ${party.birthday_person_name} (${party.birthday_person_email})? This sends the real email.`)) return
     setSendingEmail(true); setEmailResult('')
     try {
       const res = await fetch('/api/send-birthday', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partyId }) })
       const data = await res.json()
-      setEmailResult(data.ok ? `✅ ¡Enviado a ${data.to}!` : `⚠️ ${data.error}`)
+      setEmailResult(data.ok ? `✅ Sent to ${data.to}!` : `⚠️ ${data.error}`)
     } catch {
-      setEmailResult('⚠️ No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.')
+      setEmailResult('⚠️ Could not send. Check your connection and try again.')
     }
     setSendingEmail(false)
   }
@@ -503,7 +503,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                 </div>
               </div>
 
-              <label style={labelStyle}>Email del cumpleañero (para enviarle su sorpresa)</label>
+              <label style={labelStyle}>Birthday person's email (to send their surprise)</label>
               <input type="email" value={emailDraft} onChange={e => { setEmailDraft(e.target.value); setCopySaved(false) }} placeholder="isaac@email.com" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-4" style={inputStyle} />
 
               <label style={labelStyle}>Headline</label>
@@ -947,13 +947,13 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
               <div className="mt-4 pt-4" style={{ borderTop: '1px dashed rgba(201,168,76,0.3)' }}>
                 <p className="text-xs mb-2" style={{ color: 'rgba(253,246,227,0.4)' }}>
                   {party.birthday_person_email
-                    ? <>Opcional: enviarle a <span style={{ color: 'var(--gold)' }}>{party.birthday_person_email}</span> un correo temático con el enlace a su periódico.</>
-                    : <>Opcional: agrega el email de {party.birthday_person_name} en “✏️ Edit invitation” para enviarle su sorpresa por correo (a futuro).</>}
+                    ? <>Optional: send <span style={{ color: 'var(--gold)' }}>{party.birthday_person_email}</span> a themed email with the link to their newspaper.</>
+                    : <>Optional: add {party.birthday_person_name}'s email in “✏️ Edit invitation” to email them their surprise (for later).</>}
                 </p>
                 <button onClick={sendBirthdayEmail} disabled={sendingEmail || !party.birthday_person_email}
                   className="w-full py-3.5 rounded-xl font-bold text-sm active:scale-95 transition-all disabled:opacity-40"
                   style={{ background: 'linear-gradient(135deg, var(--gold), var(--terracotta))', color: 'var(--cream)' }}>
-                  {sendingEmail ? 'Enviando…' : `🎉 Enviar correo de cumpleaños a ${party.birthday_person_name}`}
+                  {sendingEmail ? 'Sending…' : `🎉 Send birthday email to ${party.birthday_person_name}`}
                 </button>
                 {emailResult && (
                   <p className="text-xs mt-2 px-3 py-2 rounded-lg leading-relaxed" style={{ background: 'rgba(255,255,255,0.05)', color: emailResult.startsWith('✅') ? '#a8c99a' : '#f0a07a' }}>
@@ -1055,9 +1055,9 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
 
               {/* Alternate missions (the guest can swap to one of these) */}
               <div className="rounded-xl p-3 mb-5" style={{ background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <p className="text-xs font-semibold mb-1" style={{ color: 'rgba(201,168,76,0.7)' }}>🎲 Misiones alternativas (para que el invitado pueda cambiar)</p>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'rgba(201,168,76,0.7)' }}>🎲 Alternate missions (so the guest can swap)</p>
                 <p className="text-[0.65rem] mb-3" style={{ color: 'rgba(253,246,227,0.3)' }}>
-                  Agrega 3–5 opciones por nivel, fieles a su rol. El invitado solo puede cambiar dentro del mismo nivel.
+                  Add 3–5 options per level, true to their role. The guest can only swap within the same level.
                 </p>
                 {([['easy', '🟢 Easy'], ['medium', '🟡 Medium'], ['legendary', '🔥 Legendary']] as const).map(([tier, label]) => (
                   <div key={tier} className="mb-3">
@@ -1065,12 +1065,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                     <div className="flex flex-col gap-1.5">
                       {altsDraft[tier].map((alt, i) => (
                         <div key={i} className="flex gap-1.5 items-start">
-                          <textarea value={alt} onChange={e => updateAlt(tier, i, e.target.value)} rows={2} placeholder="Otra misión del mismo estilo…" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none resize-none" style={inputStyle} />
+                          <textarea value={alt} onChange={e => updateAlt(tier, i, e.target.value)} rows={2} placeholder="Another mission in the same vibe…" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none resize-none" style={inputStyle} />
                           <button type="button" onClick={() => removeAlt(tier, i)} className="w-7 h-7 rounded-lg text-xs flex-shrink-0 mt-0.5" style={{ background: 'rgba(196,98,45,0.18)', color: '#f0a07a' }}>×</button>
                         </div>
                       ))}
                       <button type="button" onClick={() => addAlt(tier)} className="text-xs py-1.5 rounded-lg" style={{ color: 'rgba(201,168,76,0.7)', background: 'rgba(201,168,76,0.06)', border: '1px dashed rgba(201,168,76,0.25)' }}>
-                        + Agregar opción {label}
+                        + Add {label} option
                       </button>
                     </div>
                   </div>

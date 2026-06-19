@@ -958,7 +958,7 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
 
                               {swapFlash[m.key] && (
                                 <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="text-xs font-bold mb-2 text-center" style={{ color: 'var(--leaf)' }}>
-                                  🎲 Nueva misión — ¿esta te late más?
+                                  🎲 New mission — does this one fit you better?
                                 </motion.p>
                               )}
 
@@ -969,21 +969,21 @@ export default function GuestInvite({ params }: { params: Promise<{ guestCode: s
                                     <button onClick={() => swapMission(m.key)}
                                       className="w-full mb-2 py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all"
                                       style={{ background: 'rgba(45,58,74,0.05)', color: 'var(--riviera-ink-soft)' }}>
-                                      🎲 Swap — muéstrame otra
+                                      🎲 Swap — show me another
                                     </button>
                                   )}
                                   <button onClick={() => acceptMission(m.key)}
                                     className="w-full py-3 rounded-2xl font-bold text-sm active:scale-95 transition-all"
                                     style={{ background: 'var(--leaf)', color: '#fff' }}>
-                                    Aceptar esta misión ✋
+                                    Accept this mission ✋
                                   </button>
                                 </div>
                               ) : (
                               <div onPointerDown={e => e.stopPropagation()}>
                               <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-bold" style={{ color: 'var(--leaf)' }}>✅ Misión aceptada</p>
+                                <p className="text-xs font-bold" style={{ color: 'var(--leaf)' }}>✅ Mission accepted</p>
                                 {canSwap && !done && !missionsClosed && (
-                                  <button onClick={() => unlockMission(m.key)} className="text-xs font-semibold" style={{ color: 'var(--riviera-ink-soft)' }}>🎲 Cambiar</button>
+                                  <button onClick={() => unlockMission(m.key)} className="text-xs font-semibold" style={{ color: 'var(--riviera-ink-soft)' }}>🎲 Change</button>
                                 )}
                               </div>
 

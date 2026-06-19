@@ -22,9 +22,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // generic preview
   }
 
-  const who = name || 'el cumpleañero'
-  const title = `📰 El Periódico de Cumpleaños de ${who}`
-  const description = `${who}, tu tripulación tiene una sorpresa para ti 🚢 — toca para abrir tu regalo: fotos, recuerdos, misiones y mensajes de toda la tripulación 💛`
+  const who = name || 'the birthday star'
+  const title = `📰 ${who}'s Birthday Newspaper`
+  const description = `${who}, your crew has a surprise for you 🚢 — tap to open your gift: photos, memories, missions, and messages from the whole crew 💛`
   const images = image ? [{ url: image, width: 800, height: 800, alt: title }] : []
 
   return {
