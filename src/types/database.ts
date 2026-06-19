@@ -62,6 +62,7 @@ export interface Party {
   host_id: string
   birthday_person_name: string
   birthday_person_photo: string | null
+  birthday_person_email: string | null
   party_title: string
   party_date: string
   invite_headline: string | null

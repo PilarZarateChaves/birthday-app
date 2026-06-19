@@ -53,6 +53,9 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [storyDraft, setStoryDraft] = useState('')
   const [dateDraft, setDateDraft] = useState('')
   const [timeDraft, setTimeDraft] = useState('')
+  const [emailDraft, setEmailDraft] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailResult, setEmailResult] = useState('')
   const [savingCopy, setSavingCopy] = useState(false)
   const [copySaved, setCopySaved] = useState(false)
   const [copyError, setCopyError] = useState('')
@@ -82,6 +85,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
       setStoryDraft(p.party_story ?? '')
       setDateDraft(p.party_date ?? '')
       setTimeDraft(p.event_time ?? '')
+      setEmailDraft(p.birthday_person_email ?? '')
       setNoteBlocks(Array.isArray(p.event_notes) ? p.event_notes : [])
       const npx = p.newspaper ?? {}
       setNpDraft({
@@ -103,10 +107,11 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
     const story = storyDraft.trim() || null
     const pdate = dateDraft || null
     const ptime = timeDraft.trim() || null
+    const bemail = emailDraft.trim() || null
 
-    const { error } = await supabase.from('parties').update({ invite_headline: headline, party_story: story, party_date: pdate, event_time: ptime }).eq('id', partyId)
+    const { error } = await supabase.from('parties').update({ invite_headline: headline, party_story: story, party_date: pdate, event_time: ptime, birthday_person_email: bemail }).eq('id', partyId)
     if (!error) {
-      setParty(p => p ? { ...p, invite_headline: headline, party_story: story, party_date: pdate ?? p.party_date, event_time: ptime } : p)
+      setParty(p => p ? { ...p, invite_headline: headline, party_story: story, party_date: pdate ?? p.party_date, event_time: ptime, birthday_person_email: bemail } : p)
       setCopySaved(true)
       setTimeout(() => setCopySaved(false), 2500)
       setSavingCopy(false)
@@ -122,6 +127,21 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
       setCopyError(retry.error.message)
     }
     setSavingCopy(false)
+  }
+
+  async function sendBirthdayEmail() {
+    if (!party || sendingEmail) return
+    if (!party.birthday_person_email) { setEmailResult('Primero agrega y guarda el email del cumpleañero arriba.'); return }
+    if (!confirm(`¿Enviar el correo de cumpleaños a ${party.birthday_person_name} (${party.birthday_person_email})? Esto le manda el correo de verdad.`)) return
+    setSendingEmail(true); setEmailResult('')
+    try {
+      const res = await fetch('/api/send-birthday', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partyId }) })
+      const data = await res.json()
+      setEmailResult(data.ok ? `✅ ¡Enviado a ${data.to}!` : `⚠️ ${data.error}`)
+    } catch {
+      setEmailResult('⚠️ No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.')
+    }
+    setSendingEmail(false)
   }
 
   // ── Captain's Notes (event_notes) ──
@@ -462,6 +482,9 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                   <input value={timeDraft} onChange={e => { setTimeDraft(e.target.value); setCopySaved(false) }} placeholder="3:00 PM" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={inputStyle} />
                 </div>
               </div>
+
+              <label style={labelStyle}>Email del cumpleañero (para enviarle su sorpresa)</label>
+              <input type="email" value={emailDraft} onChange={e => { setEmailDraft(e.target.value); setCopySaved(false) }} placeholder="isaac@email.com" className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-4" style={inputStyle} />
 
               <label style={labelStyle}>Headline</label>
               <textarea
@@ -897,6 +920,25 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                 style={party.newspaper.published ? { background: 'rgba(255,255,255,0.06)', color: 'rgba(253,246,227,0.6)', border: '1px solid rgba(255,255,255,0.1)' } : { background: 'var(--terracotta)', color: 'var(--cream)' }}>
                 {party.newspaper.published ? 'Hide from guests' : '📣 Make visible to guests'}
               </button>
+
+              {/* Send the magical birthday email */}
+              <div className="mt-4 pt-4" style={{ borderTop: '1px dashed rgba(201,168,76,0.3)' }}>
+                <p className="text-xs mb-2" style={{ color: 'rgba(253,246,227,0.4)' }}>
+                  {party.birthday_person_email
+                    ? <>Le enviaremos a <span style={{ color: 'var(--gold)' }}>{party.birthday_person_email}</span> un correo temático con el enlace a su periódico.</>
+                    : <>Agrega el email de {party.birthday_person_name} en “✏️ Edit invitation” (y guarda) para poder enviarle su sorpresa.</>}
+                </p>
+                <button onClick={sendBirthdayEmail} disabled={sendingEmail || !party.birthday_person_email}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm active:scale-95 transition-all disabled:opacity-40"
+                  style={{ background: 'linear-gradient(135deg, var(--gold), var(--terracotta))', color: 'var(--cream)' }}>
+                  {sendingEmail ? 'Enviando…' : `🎉 Enviar correo de cumpleaños a ${party.birthday_person_name}`}
+                </button>
+                {emailResult && (
+                  <p className="text-xs mt-2 px-3 py-2 rounded-lg leading-relaxed" style={{ background: 'rgba(255,255,255,0.05)', color: emailResult.startsWith('✅') ? '#a8c99a' : '#f0a07a' }}>
+                    {emailResult}
+                  </p>
+                )}
+              </div>
             </>
           )}
         </div>
