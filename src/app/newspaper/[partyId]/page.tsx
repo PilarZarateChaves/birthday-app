@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, use, Suspense } from 'react'
+import { motion } from 'framer-motion'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { Party, Guest, Newspaper } from '@/types/database'
+import type { Party, Guest, Newspaper, Tribute } from '@/types/database'
 
 const PAPER = '#f4efe1'
 const INK = '#2a2620'
@@ -27,16 +28,20 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
   const hostMode = search.get('host') === '1'
   const [party, setParty] = useState<Party | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
+  const [tributes, setTributes] = useState<Tribute[]>([])
   const [loading, setLoading] = useState(true)
   const [hidden, setHidden] = useState<string[]>([])
+  const [bottlesOpen, setBottlesOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([
       supabase.from('parties').select('*').eq('id', partyId).single(),
       supabase.from('guests').select('*').eq('party_id', partyId).eq('rsvp_status', 'accepted').order('created_at'),
-    ]).then(([{ data: p }, { data: g }]) => {
+      supabase.from('tributes').select('*').eq('party_id', partyId).order('created_at'),
+    ]).then(([{ data: p }, { data: g }, t]) => {
       setParty(p)
       setGuests((g ?? []).filter((x: Guest) => x.name))
+      setTributes((t?.data ?? []) as Tribute[])
       const npHidden = (p?.newspaper as Newspaper | undefined)?.hidden
       setHidden(Array.isArray(npHidden) ? npHidden : [])
       setLoading(false)
@@ -126,6 +131,7 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
   })
   const visiblePhotos = photos.filter(p => show(p.url))
   const hostPhotoSet = new Set(np.host_photos ?? [])
+  const visibleTributes = tributes.filter(t => show('bottle:' + t.id))
 
   const Rule = ({ thick }: { thick?: boolean }) => <div style={{ borderTop: `${thick ? 3 : 1}px solid ${INK}` }} />
   const HideBtn = ({ k }: { k: string }) => hostMode ? (
@@ -314,6 +320,47 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
           </div>
         )}
 
+        {/* ── SURPRISE: MESSAGES IN A BOTTLE ── */}
+        {visibleTributes.length > 0 && (
+          <div className="mt-9 pt-6" style={{ borderTop: `3px double ${INK}` }}>
+            {!bottlesOpen ? (
+              <button onClick={() => setBottlesOpen(true)} className="w-full flex flex-col items-center py-4 active:scale-95 transition-transform">
+                <motion.div animate={{ rotate: [-6, 6, -6], y: [0, -5, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
+                  <BottleGlyph />
+                </motion.div>
+                <p style={{ fontFamily: serif, fontWeight: 900, fontSize: '1.35rem', marginTop: 8, textAlign: 'center' }}>
+                  {visibleTributes.length} Message{visibleTributes.length === 1 ? '' : 's'} in a Bottle
+                </p>
+                <p className="text-sm italic" style={{ color: INK_SOFT }}>From those who couldn’t be aboard · tap to uncork →</p>
+              </button>
+            ) : (
+              <div>
+                <SectionHead title="Messages in a Bottle" />
+                <p className="text-center text-sm italic mb-4" style={{ color: INK_SOFT }}>Washed ashore from people who love you.</p>
+                <div className="flex flex-col gap-4">
+                  {visibleTributes.map((t, i) => (
+                    <motion.div key={t.id}
+                      initial={{ opacity: 0, y: 18, rotate: i % 2 ? 1.4 : -1.4 }} animate={{ opacity: 1, y: 0, rotate: i % 2 ? 1.4 : -1.4 }}
+                      transition={{ duration: 0.5, delay: i * 0.12, ease: [0.16, 1, 0.3, 1] }}
+                      className="relative px-4 py-4" style={{ border: `1px solid ${INK}`, background: '#fffdf6', boxShadow: '0 4px 14px rgba(42,38,32,0.12)' }}>
+                      <HideBtn k={'bottle:' + t.id} />
+                      {t.media_url && (
+                        <div className="mb-3" style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
+                          {t.media_type === 'video'
+                            ? <video src={t.media_url} controls className="w-full object-cover" style={{ display: 'block', maxHeight: 280 }} />
+                            : <img src={t.media_url} alt="" className="w-full object-cover" style={{ display: 'block', maxHeight: 320, filter: 'saturate(0.95)' }} />}
+                        </div>
+                      )}
+                      {t.message && <p className="italic" style={{ fontSize: '1rem', lineHeight: 1.5, paddingRight: hostMode ? 48 : 0 }}>“{t.message}”</p>}
+                      <p className="text-xs uppercase tracking-widest mt-2" style={{ color: INK_SOFT }}>🍾 — {t.name}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── FOOTER ── */}
         <div className="mt-8">
           <Rule thick />
@@ -323,6 +370,17 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
         </div>
       </div>
     </main>
+  )
+}
+
+function BottleGlyph() {
+  return (
+    <svg width="54" height="54" viewBox="0 0 54 54" fill="none" aria-hidden>
+      <path d="M23 5h8v6l3 5c1.4 2.3 2 4 2 7v18a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V23c0-3 .6-4.7 2-7l3-5V5Z" fill="#e9e2cf" stroke={INK} strokeWidth="1.6"/>
+      <rect x="22.5" y="2" width="9" height="5" rx="1" fill={INK}/>
+      <path d="M21 30h12v13a2 2 0 0 1-2 2H23a2 2 0 0 1-2-2V30Z" fill="#fffdf6" stroke={INK} strokeWidth="1.2"/>
+      <path d="M24 34h6M24 38h6" stroke={INK} strokeWidth="1.1" strokeLinecap="round"/>
+    </svg>
   )
 }
 

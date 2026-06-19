@@ -33,6 +33,16 @@ export interface EventLink {
   url: string
 }
 
+export interface Tribute {
+  id: string
+  party_id: string
+  name: string
+  message: string | null
+  media_url: string | null
+  media_type: 'photo' | 'video' | null
+  created_at: string
+}
+
 export interface Newspaper {
   created?: boolean
   published?: boolean

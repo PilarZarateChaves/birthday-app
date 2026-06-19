@@ -64,6 +64,7 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
   const [npBusy, setNpBusy] = useState(false)
   const [npSaved, setNpSaved] = useState(false)
   const [npLinkCopied, setNpLinkCopied] = useState(false)
+  const [bottleCopied, setBottleCopied] = useState(false)
 
   useEffect(() => {
     if (!localStorage.getItem('host_auth')) { router.replace('/host'); return }
@@ -794,6 +795,25 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
         >
           + Add Guest
         </button>
+
+        {/* ── Messages in a Bottle (faraway contributors) ── */}
+        <div className="rounded-2xl p-4 mb-4" style={{ background: 'rgba(95,174,158,0.1)', border: '1px solid rgba(95,174,158,0.3)' }}>
+          <p className="text-xs tracking-[0.18em] uppercase mb-1" style={{ color: '#8fd0c0' }}>🍾 Messages in a Bottle</p>
+          <p className="text-xs mb-3" style={{ color: 'rgba(253,246,227,0.4)' }}>
+            Share this with {party?.birthday_person_name}'s parents and faraway loved ones. They float a wish, photo, or video into the newspaper — no app, no login.
+          </p>
+          <button
+            onClick={() => {
+              if (!party) return
+              navigator.clipboard.writeText(`${window.location.origin}/bottle/${party.invite_code}`)
+              setBottleCopied(true); setTimeout(() => setBottleCopied(false), 2000)
+            }}
+            className="w-full py-3 rounded-xl text-sm font-semibold active:scale-95 transition-all"
+            style={bottleCopied ? { background: 'rgba(107,127,94,0.25)', color: '#a8c99a', border: '1px solid rgba(107,127,94,0.4)' } : { background: '#5fae9e', color: '#fff' }}
+          >
+            {bottleCopied ? '✓ Link copied' : '🍾 Copy the Messages-in-a-Bottle link'}
+          </button>
+        </div>
 
         {/* ── Birthday Newspaper (Isaac's gift) ── */}
         <div className="rounded-2xl p-4" style={{ background: 'rgba(201,168,76,0.07)', border: '1px solid rgba(201,168,76,0.2)' }}>
