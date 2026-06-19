@@ -172,15 +172,34 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
           {!sent ? (
             <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -20 }}>
 
-              {/* Hero bottle */}
-              <div className="relative mx-auto mb-5" style={{ width: 160, height: 180 }}>
+              {/* Hero: birthday photo with the bottle bobbing at its base */}
+              <div className="relative mx-auto mb-9" style={{ width: 230 }}>
                 {sparkles.map((sp, i) => (
-                  <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.7) 55%, transparent 100%)', animation: `twinkle 3.2s ease-in-out ${sp.d} infinite`, zIndex: 3 }} />
+                  <span key={i} className="marina-anim" style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle, #fff 0%, rgba(255,210,63,0.7) 55%, transparent 100%)', animation: `twinkle 3.2s ease-in-out ${sp.d} infinite`, zIndex: 6 }} />
                 ))}
-                <motion.div animate={{ y: [0, -10, 0], rotate: [-5, 5, -5] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute left-1/2" style={{ transform: 'translateX(-50%)', filter: 'drop-shadow(0 12px 22px rgba(63,142,126,0.3))' }}>
-                  <BottleArt />
-                </motion.div>
+
+                <div className="rounded-[2rem] overflow-hidden relative mx-auto" style={{ width: '100%', border: '6px solid #fff', boxShadow: '0 16px 42px rgba(45,58,74,0.22)', ...(party.birthday_person_photo ? {} : { aspectRatio: '9 / 10' }) }}>
+                  {party.birthday_person_photo
+                    ? <img src={party.birthday_person_photo} alt={bday} className="w-full" decoding="async" draggable={false} style={{ display: 'block', height: 'auto' }} />
+                    : <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--sky), var(--leaf))', color: '#fff', fontSize: '4rem', fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{bday[0]}</div>}
+                  {/* waves lapping the base of the photo */}
+                  <div className="absolute left-0 right-0 bottom-0" style={{ height: 26, overflow: 'hidden' }}>
+                    <svg className="marina-anim" viewBox="0 0 120 28" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, width: '200%', height: 26, animation: 'waveSlide 8s linear infinite', opacity: 0.55 }}>
+                      <path d="M0 16 Q7.5 9 15 16 T30 16 T45 16 T60 16 T75 16 T90 16 T105 16 T120 16 V28 H0 Z" fill="rgba(159,202,181,0.9)" />
+                    </svg>
+                    <svg className="marina-anim" viewBox="0 0 120 28" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, width: '200%', height: 26, animation: 'waveSlide 5.5s linear infinite', opacity: 0.8 }}>
+                      <path d="M0 19 Q7.5 13 15 19 T30 19 T45 19 T60 19 T75 19 T90 19 T105 19 T120 19 V28 H0 Z" fill="rgba(199,232,247,0.95)" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* bottle bobbing on the waves at the bottom of the photo */}
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: -34, display: 'flex', justifyContent: 'center', zIndex: 7 }}>
+                  <motion.div animate={{ y: [0, -7, 0], rotate: [-7, 7, -7] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{ filter: 'drop-shadow(0 8px 14px rgba(63,142,126,0.35))' }}>
+                    <div style={{ transform: 'scale(0.62)', transformOrigin: 'bottom center' }}><BottleArt /></div>
+                  </motion.div>
+                </div>
               </div>
 
               <p className="text-center tracking-[0.28em] uppercase mb-2" style={{ fontSize: '0.62rem', color: 'var(--leaf)' }}>
