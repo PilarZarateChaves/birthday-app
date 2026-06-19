@@ -41,6 +41,7 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
+  const [lang, setLang] = useState<'es' | 'en'>('es')
 
   useEffect(() => {
     supabase.from('parties').select('id, birthday_person_name, birthday_person_photo').eq('invite_code', code).single()
@@ -67,7 +68,7 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
   async function send() {
     if (!party || sending) return
     if (!name.trim() || (!message.trim() && !file)) {
-      setError('Add your name and a little message (or a photo/video).')
+      setError(lang === 'es' ? 'Escribe tu nombre y un mensajito (o una foto/video).' : 'Add your name and a little message (or a photo/video).')
       return
     }
     setSending(true); setError('')
@@ -87,7 +88,7 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
       party_id: party.id, name: name.trim(), message: message.trim() || null, media_url, media_type,
     })
     if (insErr) {
-      setError('Hmm, that didn\'t send. Please try again in a moment.')
+      setError(lang === 'es' ? 'Uy, no se envió. Intenta de nuevo en un momento.' : 'Hmm, that didn\'t send. Please try again in a moment.')
       setSending(false)
       return
     }
@@ -99,12 +100,43 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
   if (notFound || !party) return (
     <main className="min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--riviera-bg)' }}>
       <p style={{ color: 'var(--riviera-ink-soft)', fontFamily: "'Playfair Display', serif", fontStyle: 'italic', textAlign: 'center' }}>
-        This bottle link wasn't found.<br /><span style={{ fontSize: '0.8rem' }}>Double-check the link.</span>
+        No encontramos este enlace.<br /><span style={{ fontSize: '0.8rem' }}>This bottle link wasn't found.</span>
       </p>
     </main>
   )
 
   const bday = party.birthday_person_name
+  const t = lang === 'es' ? {
+    eyebrow: 'Un mensaje en una botella',
+    title: `Envíale algo a ${bday} 🍾`,
+    intro: `${bday} se va de paseo en barco por su cumpleaños. No puedes estar a bordo, pero tu botella sí. Escríbele un deseo, agrega una foto o un video, y lo haremos flotar hasta su periódico de cumpleaños.`,
+    fromLabel: '¿De parte de quién?',
+    fromPh: 'Mamá · Abuelo Tito · Sofía desde Madrid',
+    msgLabel: 'Tu mensaje',
+    msgPh: `Feliz cumpleaños, ${bday}…`,
+    addMedia: '📷 Agregar foto o video (opcional)',
+    remove: 'quitar',
+    send: 'Enviarla flotando 🌊',
+    sending: 'Enviando…',
+    sentTitle: '¡Tu botella va en camino!',
+    sentBody: `Está flotando hasta el periódico de cumpleaños de ${bday}. Gracias por ser parte de la sorpresa 💛`,
+    another: 'Enviar otro mensaje',
+  } : {
+    eyebrow: 'A message in a bottle',
+    title: `Send ${bday} a little something 🍾`,
+    intro: `${bday} is setting sail for a birthday boat day. You can't be aboard, but your bottle can. Write a wish, add a photo or a video, and we'll float it into ${bday}'s birthday newspaper.`,
+    fromLabel: "Who's it from?",
+    fromPh: 'Mom · Abuelo Tito · Sofía from Madrid',
+    msgLabel: 'Your message',
+    msgPh: `Happy birthday, ${bday}…`,
+    addMedia: '📷 Add a photo or video (optional)',
+    remove: 'remove',
+    send: 'Send it floating 🌊',
+    sending: 'Sending…',
+    sentTitle: 'Your bottle is on its way!',
+    sentBody: `It's floating to ${bday}'s birthday newspaper. Thank you for being part of the surprise 💛`,
+    another: 'Send another message',
+  }
 
   return (
     <main className="min-h-screen relative overflow-hidden px-5 pb-24" style={{ background: 'var(--riviera-bg)' }}>
@@ -123,7 +155,19 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
         </svg>
       </div>
 
-      <div className="max-w-sm mx-auto relative z-10 pt-10">
+      <div className="max-w-sm mx-auto relative z-10 pt-5">
+        {/* language toggle */}
+        <div className="flex justify-end mb-3">
+          <div className="inline-flex rounded-full p-0.5" style={{ background: 'rgba(255,255,255,0.6)', boxShadow: '0 2px 8px rgba(45,58,74,0.08)' }}>
+            {(['es', 'en'] as const).map(l => (
+              <button key={l} onClick={() => setLang(l)} className="px-3 py-1 rounded-full text-xs font-bold uppercase transition-all"
+                style={lang === l ? { background: 'var(--leaf)', color: '#fff' } : { background: 'transparent', color: 'var(--riviera-ink-soft)' }}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <AnimatePresence mode="wait">
           {!sent ? (
             <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -20 }}>
@@ -140,23 +184,23 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
               </div>
 
               <p className="text-center tracking-[0.28em] uppercase mb-2" style={{ fontSize: '0.62rem', color: 'var(--leaf)' }}>
-                A message in a bottle
+                {t.eyebrow}
               </p>
               <h1 className="text-center" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.7rem', fontWeight: 700, color: 'var(--riviera-ink)', lineHeight: 1.2, marginBottom: '0.6rem' }}>
-                Send {bday} a little something 🍾
+                {t.title}
               </h1>
               <p className="text-center text-sm leading-relaxed mb-7" style={{ color: 'var(--riviera-ink-soft)' }}>
-                {bday} is setting sail for a birthday boat day. You can't be aboard, but your bottle can. Write a wish, add a photo or a video, and we'll float it into {bday}'s birthday newspaper.
+                {t.intro}
               </p>
 
               <div className="rounded-3xl px-5 py-5 mb-4" style={{ background: '#fff', boxShadow: '0 8px 26px rgba(45,58,74,0.08)' }}>
-                <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--riviera-ink-soft)' }}>Who's it from?</label>
-                <input value={name} onChange={e => { setName(e.target.value); setError('') }} placeholder="Mom · Abuelo Tito · Sofía from Madrid"
+                <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--riviera-ink-soft)' }}>{t.fromLabel}</label>
+                <input value={name} onChange={e => { setName(e.target.value); setError('') }} placeholder={t.fromPh}
                   className="w-full px-4 py-3 rounded-2xl text-sm outline-none mb-4"
                   style={{ background: 'var(--riviera-bg)', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.12)' }} />
 
-                <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--riviera-ink-soft)' }}>Your message</label>
-                <textarea value={message} onChange={e => { setMessage(e.target.value); setError('') }} rows={4} placeholder={`Happy birthday, ${bday}…`}
+                <label className="block text-xs font-bold mb-1.5" style={{ color: 'var(--riviera-ink-soft)' }}>{t.msgLabel}</label>
+                <textarea value={message} onChange={e => { setMessage(e.target.value); setError('') }} rows={4} placeholder={t.msgPh}
                   className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none mb-4"
                   style={{ background: 'var(--riviera-bg)', color: 'var(--riviera-ink)', border: '1.5px solid rgba(45,58,74,0.12)' }} />
 
@@ -165,13 +209,13 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
                     {isVid
                       ? <video src={preview} controls className="w-full rounded-2xl" style={{ maxHeight: 240 }} />
                       : <img src={preview} alt="" className="w-full rounded-2xl object-cover" style={{ maxHeight: 240 }} />}
-                    <button onClick={() => { setFile(null); setPreview('') }} className="absolute top-2 right-2 px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: 'var(--coral)', color: '#fff' }}>remove</button>
+                    <button onClick={() => { setFile(null); setPreview('') }} className="absolute top-2 right-2 px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: 'var(--coral)', color: '#fff' }}>{t.remove}</button>
                   </div>
                 ) : (
                   <label className="block">
                     <div className="w-full py-3 rounded-2xl font-bold text-sm text-center cursor-pointer active:scale-95 transition-all"
                       style={{ background: 'var(--sky-soft)', color: 'var(--sky)' }}>
-                      📷 Add a photo or video (optional)
+                      {t.addMedia}
                     </div>
                     <input type="file" accept="image/*,video/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) pickFile(f) }} />
                   </label>
@@ -183,7 +227,7 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
               <button onClick={send} disabled={sending}
                 className="w-full py-4 rounded-2xl font-bold text-base active:scale-95 transition-all disabled:opacity-60"
                 style={{ background: 'var(--leaf)', color: '#fff', boxShadow: '0 8px 24px rgba(95,174,126,0.4)' }}>
-                {sending ? 'Sending…' : 'Send it floating 🌊'}
+                {sending ? t.sending : t.send}
               </button>
             </motion.div>
           ) : (
@@ -196,14 +240,14 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
               <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }}>
                 <p style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>🌊</p>
                 <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.6rem', fontWeight: 700, color: 'var(--riviera-ink)', marginBottom: '0.5rem' }}>
-                  Your bottle is on its way!
+                  {t.sentTitle}
                 </h1>
                 <p className="text-sm leading-relaxed mb-7" style={{ color: 'var(--riviera-ink-soft)' }}>
-                  It's floating to {bday}'s birthday newspaper. Thank you for being part of the surprise 💛
+                  {t.sentBody}
                 </p>
                 <button onClick={() => { setSent(false); setName(''); setMessage(''); setFile(null); setPreview('') }}
                   className="text-sm font-semibold underline" style={{ color: 'var(--leaf)' }}>
-                  Send another message
+                  {t.another}
                 </button>
               </motion.div>
             </motion.div>

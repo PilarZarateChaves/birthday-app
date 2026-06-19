@@ -20,8 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   } catch {
     // generic preview
   }
-  const title = `Send ${bday} a message in a bottle 🍾`
-  const description = `${bday} is having a birthday boat day. Float them a wish, a photo, or a video — it goes into their birthday newspaper.`
+  const title = `Envíale a ${bday} un mensaje en una botella 🍾`
+  const description = `${bday} celebra su cumpleaños en barco. Mándale un deseo, una foto o un video — irá en su periódico de cumpleaños.`
   const images = image ? [{ url: image, width: 800, height: 800, alt: title }] : []
   return {
     title,
