@@ -921,12 +921,12 @@ export default function HostDashboard({ params }: { params: Promise<{ partyId: s
                 {party.newspaper.published ? 'Hide from guests' : '📣 Make visible to guests'}
               </button>
 
-              {/* Send the magical birthday email */}
+              {/* Send the magical birthday email (optional — needs RESEND_API_KEY) */}
               <div className="mt-4 pt-4" style={{ borderTop: '1px dashed rgba(201,168,76,0.3)' }}>
                 <p className="text-xs mb-2" style={{ color: 'rgba(253,246,227,0.4)' }}>
                   {party.birthday_person_email
-                    ? <>Le enviaremos a <span style={{ color: 'var(--gold)' }}>{party.birthday_person_email}</span> un correo temático con el enlace a su periódico.</>
-                    : <>Agrega el email de {party.birthday_person_name} en “✏️ Edit invitation” (y guarda) para poder enviarle su sorpresa.</>}
+                    ? <>Opcional: enviarle a <span style={{ color: 'var(--gold)' }}>{party.birthday_person_email}</span> un correo temático con el enlace a su periódico.</>
+                    : <>Opcional: agrega el email de {party.birthday_person_name} en “✏️ Edit invitation” para enviarle su sorpresa por correo (a futuro).</>}
                 </p>
                 <button onClick={sendBirthdayEmail} disabled={sendingEmail || !party.birthday_person_email}
                   className="w-full py-3.5 rounded-xl font-bold text-sm active:scale-95 transition-all disabled:opacity-40"
