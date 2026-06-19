@@ -108,8 +108,8 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
   const bday = party.birthday_person_name
   const t = lang === 'es' ? {
     eyebrow: 'Un mensaje en una botella',
-    title: `Envíale algo a ${bday} 🍾`,
-    intro: `${bday} se va de paseo en barco por su cumpleaños. No puedes estar a bordo, pero tu botella sí. Escríbele un deseo, agrega una foto o un video, y lo haremos flotar hasta su periódico de cumpleaños.`,
+    title: `Lánzale una botella al mar a ${bday} 🌊🍾`,
+    intro: `Estaremos celebrando el cumpleaños de ${bday} este domingo con una fiesta en barco al estilo gondolero veneciano 🚣. No podrás estar a bordo con nosotros, pero tu botella sí. Hazle llegar tu deseo, agrega una foto o un video, y lo haremos flotar hasta él. Al final del día, ${bday} recibirá un periódico de cumpleaños con los mensajes de todos 💛.`,
     fromLabel: '¿De parte de quién?',
     fromPh: 'Mamá · Abuelo Tito · Sofía desde Madrid',
     msgLabel: 'Tu mensaje',
@@ -123,8 +123,8 @@ export default function BottlePage({ params }: { params: Promise<{ code: string 
     another: 'Enviar otro mensaje',
   } : {
     eyebrow: 'A message in a bottle',
-    title: `Send ${bday} a little something 🍾`,
-    intro: `${bday} is setting sail for a birthday boat day. You can't be aboard, but your bottle can. Write a wish, add a photo or a video, and we'll float it into ${bday}'s birthday newspaper.`,
+    title: `Toss ${bday} a message in a bottle 🌊🍾`,
+    intro: `We're celebrating ${bday}'s birthday this Sunday with a Venetian gondolier boat party 🚣. You can't be aboard with us, but your bottle can. Send your wish, add a photo or a video, and we'll float it to ${bday}. At the end of the day, ${bday} gets a birthday newspaper with everyone's messages 💛.`,
     fromLabel: "Who's it from?",
     fromPh: 'Mom · Abuelo Tito · Sofía from Madrid',
     msgLabel: 'Your message',
