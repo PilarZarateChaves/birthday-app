@@ -121,13 +121,17 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
     .filter(g => g.memory_favorite_moment && g.memory_favorite_moment.trim())
     .map(g => ({ key: `note:${g.id}`, name: g.name.split(' ')[0], text: g.memory_favorite_moment! }))
     .filter(n => show(n.key))
-  const photos: { url: string; name: string }[] = []
+  const photos: { url: string; name: string; mission?: string }[] = []
   ;(np.host_photos ?? []).forEach(u => photos.push({ url: u, name: 'The host' }))
   guests.forEach(g => {
     const first = g.name.split(' ')[0]
     ;(Array.isArray(g.memory_photos) ? g.memory_photos : []).forEach(u => photos.push({ url: u, name: first }))
     const mp = g.mission_progress ?? {}
-    Object.values(mp).forEach(e => (e?.media ?? []).forEach(u => photos.push({ url: u, name: first })))
+    const tierText: Record<string, string | null> = { easy: g.mission_easy, medium: g.mission_medium, legendary: g.mission_legendary }
+    for (const [tier, e] of Object.entries(mp)) {
+      const cap = (e?.done && tierText[tier]) ? (tierText[tier] as string) : undefined
+      ;(e?.media ?? []).forEach(u => photos.push({ url: u, name: first, mission: cap }))
+    }
   })
   const visiblePhotos = photos.filter(p => show(p.url))
   const hostPhotoSet = new Set(np.host_photos ?? [])
@@ -229,8 +233,8 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
           </div>
         )}
 
-        {/* ── MISSION HIGHLIGHTS ── */}
-        {highlights.length > 0 && (
+        {/* ── MISSION HIGHLIGHTS (hidden — missions now caption their photos) ── */}
+        {false && highlights.length > 0 && (
           <div className="pt-7">
             <SectionHead title="Mission Highlights" />
             <ul className="flex flex-col gap-2.5">
@@ -296,10 +300,15 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
                       ) : (
                         <HideBtn k={p.url} />
                       )}
-                      <div style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
+                      <div className="relative" style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
                         {isVideo(p.url)
                           ? <video src={p.url} controls className="w-full aspect-square object-cover" style={{ display: 'block' }} />
                           : <img src={p.url} alt="" className="w-full aspect-square object-cover" style={{ display: 'block', filter: 'saturate(0.95)' }} />}
+                        {p.mission && (
+                          <div style={{ position: 'absolute', left: 4, right: 4, bottom: 4, background: 'rgba(42,38,32,0.82)', color: '#f4efe1', padding: '4px 7px', fontSize: 9.5, lineHeight: 1.3, fontStyle: 'italic' }}>
+                            ✓ {p.mission}
+                          </div>
+                        )}
                       </div>
                       <figcaption className="text-xs italic mt-1" style={{ color: INK_SOFT }}>📷 {isHostPhoto ? 'Captain’s pick' : p.name}</figcaption>
                     </figure>
