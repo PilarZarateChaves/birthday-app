@@ -268,6 +268,80 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
           </div>
         )}
 
+        {/* ── MESSAGES IN A BOTTLE (under Letters to the Captain) ── */}
+        {visibleTributes.length > 0 && (
+          <div className="pt-7">
+            {!bottlesOpen ? (
+              <div>
+                {/* ocean cove with a bobbing bottle */}
+                <div className="relative overflow-hidden" style={{ height: 190, borderRadius: 10, border: `1px solid ${INK}`, background: 'linear-gradient(180deg,#d6eef7 0%,#a9d9ea 42%,#5fa9c4 100%)' }}>
+                  <div style={{ position: 'absolute', top: -28, right: -12, width: 96, height: 96, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,233,150,0.95), transparent 68%)' }} />
+                  {[{ t: 16, l: '20%', s: 7, d: '0s' }, { t: 30, l: '74%', s: 6, d: '1s' }, { t: 60, l: '38%', s: 5, d: '0.6s' }, { t: 24, l: '54%', s: 5, d: '1.5s' }].map((sp, i) => (
+                    <span key={i} style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle,#fff,rgba(255,255,255,0.5),transparent)', animation: `twinkle 2.8s ease-in-out ${sp.d} infinite` }} />
+                  ))}
+                  <motion.div animate={{ y: [0, -9, 0], rotate: [-9, 9, -9] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{ position: 'absolute', left: '50%', top: 46, transform: 'translateX(-50%)', filter: 'drop-shadow(0 8px 10px rgba(20,60,80,0.3))' }}>
+                    <div style={{ transform: 'scale(1.5)' }}><BottleGlyph /></div>
+                  </motion.div>
+                  <svg viewBox="0 0 120 30" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: 46, animation: 'waveSlide 8s linear infinite', opacity: 0.85 }}>
+                    <path d="M0 14 Q7.5 7 15 14 T30 14 T45 14 T60 14 T75 14 T90 14 T105 14 T120 14 V30 H0 Z" fill="#4f9bb8" />
+                  </svg>
+                  <svg viewBox="0 0 120 30" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: 40, animation: 'waveSlide 5.5s linear infinite', opacity: 0.95 }}>
+                    <path d="M0 18 Q7.5 12 15 18 T30 18 T45 18 T60 18 T75 18 T90 18 T105 18 T120 18 V30 H0 Z" fill="#7cc0d6" />
+                  </svg>
+                </div>
+
+                <p style={{ fontFamily: serif, fontWeight: 900, fontSize: '1.5rem', textAlign: 'center', marginTop: 14, lineHeight: 1.1 }}>
+                  🍾 {visibleTributes.length} Message{visibleTributes.length === 1 ? '' : 's'} in a Bottle
+                </p>
+                <p className="text-center text-sm italic" style={{ color: INK_SOFT, marginTop: 2 }}>From people who love you but couldn’t be aboard.</p>
+
+                <motion.button onClick={() => setBottlesOpen(true)} whileTap={{ scale: 0.97, y: 2 }}
+                  animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  className="w-full mt-4 py-4 rounded-lg font-black"
+                  style={{ fontFamily: serif, fontSize: '1.15rem', background: '#c98a4a', color: '#fff8ec', border: `2px solid ${INK}`, boxShadow: `0 4px 0 ${INK}` }}>
+                  ✉️ Open the Letters →
+                </motion.button>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="absolute left-1/2" style={{ top: 0, zIndex: 5, pointerEvents: 'none' }}>
+                  {Array.from({ length: 16 }).map((_, i) => {
+                    const ang = (i / 16) * Math.PI * 2
+                    return <motion.span key={i} initial={{ x: 0, y: 0, opacity: 1, scale: 1 }} animate={{ x: Math.cos(ang) * 100, y: Math.sin(ang) * 80 - 6, opacity: 0, scale: 0.3 }} transition={{ duration: 1.1, ease: 'easeOut' }}
+                      style={{ position: 'absolute', width: 8, height: 8, borderRadius: i % 2 ? '50%' : 2, background: i % 3 === 0 ? '#c9a84c' : i % 3 === 1 ? '#ff7a59' : '#5fa9c4' }} />
+                  })}
+                </div>
+                <motion.div initial={{ rotate: -25, y: -8, opacity: 0, scale: 0.7 }} animate={{ rotate: 0, y: 0, opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 11 }} className="flex justify-center">
+                  <div style={{ transform: 'scale(1.2)' }}><BottleGlyph /></div>
+                </motion.div>
+                <SectionHead title="Messages in a Bottle" />
+                <p className="text-center text-sm italic mb-4" style={{ color: INK_SOFT }}>Washed ashore from people who love you.</p>
+                <div className="flex flex-col gap-4">
+                  {visibleTributes.map((t, i) => (
+                    <motion.div key={t.id}
+                      initial={{ opacity: 0, y: 34, scaleY: 0.5, rotate: i % 2 ? 2.5 : -2.5 }}
+                      animate={{ opacity: 1, y: 0, scaleY: 1, rotate: i % 2 ? 1.4 : -1.4 }}
+                      transition={{ duration: 0.55, delay: 0.3 + i * 0.16, ease: [0.16, 1, 0.3, 1] }}
+                      className="relative px-4 py-4" style={{ transformOrigin: 'top center', border: `1px solid ${INK}`, background: '#fffdf6', boxShadow: '0 4px 14px rgba(42,38,32,0.12)' }}>
+                      <HideBtn k={'bottle:' + t.id} />
+                      {t.media_url && (
+                        <div className="mb-3" style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
+                          {t.media_type === 'video'
+                            ? <video src={t.media_url} controls className="w-full object-cover" style={{ display: 'block', maxHeight: 280 }} />
+                            : <img src={t.media_url} alt="" className="w-full object-cover" style={{ display: 'block', maxHeight: 320, filter: 'saturate(0.95)' }} />}
+                        </div>
+                      )}
+                      {t.message && <p className="italic" style={{ fontSize: '1rem', lineHeight: 1.5, paddingRight: hostMode ? 48 : 0 }}>“{t.message}”</p>}
+                      <p className="text-xs uppercase tracking-widest mt-2" style={{ color: INK_SOFT }}>🍾 — {t.name}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── PHOTO PAGE ── */}
         {(visiblePhotos.length > 0 || hostMode) && (
           <div className="pt-7">
@@ -326,47 +400,6 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
             <p className="text-center" style={{ fontFamily: serif, fontSize: '1.15rem', fontStyle: 'italic', lineHeight: 1.5 }}>
               {np.final_note.trim()}
             </p>
-          </div>
-        )}
-
-        {/* ── SURPRISE: MESSAGES IN A BOTTLE ── */}
-        {visibleTributes.length > 0 && (
-          <div className="mt-9 pt-6" style={{ borderTop: `3px double ${INK}` }}>
-            {!bottlesOpen ? (
-              <button onClick={() => setBottlesOpen(true)} className="w-full flex flex-col items-center py-4 active:scale-95 transition-transform">
-                <motion.div animate={{ rotate: [-6, 6, -6], y: [0, -5, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
-                  <BottleGlyph />
-                </motion.div>
-                <p style={{ fontFamily: serif, fontWeight: 900, fontSize: '1.35rem', marginTop: 8, textAlign: 'center' }}>
-                  {visibleTributes.length} Message{visibleTributes.length === 1 ? '' : 's'} in a Bottle
-                </p>
-                <p className="text-sm italic" style={{ color: INK_SOFT }}>From those who couldn’t be aboard · tap to uncork →</p>
-              </button>
-            ) : (
-              <div>
-                <SectionHead title="Messages in a Bottle" />
-                <p className="text-center text-sm italic mb-4" style={{ color: INK_SOFT }}>Washed ashore from people who love you.</p>
-                <div className="flex flex-col gap-4">
-                  {visibleTributes.map((t, i) => (
-                    <motion.div key={t.id}
-                      initial={{ opacity: 0, y: 18, rotate: i % 2 ? 1.4 : -1.4 }} animate={{ opacity: 1, y: 0, rotate: i % 2 ? 1.4 : -1.4 }}
-                      transition={{ duration: 0.5, delay: i * 0.12, ease: [0.16, 1, 0.3, 1] }}
-                      className="relative px-4 py-4" style={{ border: `1px solid ${INK}`, background: '#fffdf6', boxShadow: '0 4px 14px rgba(42,38,32,0.12)' }}>
-                      <HideBtn k={'bottle:' + t.id} />
-                      {t.media_url && (
-                        <div className="mb-3" style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
-                          {t.media_type === 'video'
-                            ? <video src={t.media_url} controls className="w-full object-cover" style={{ display: 'block', maxHeight: 280 }} />
-                            : <img src={t.media_url} alt="" className="w-full object-cover" style={{ display: 'block', maxHeight: 320, filter: 'saturate(0.95)' }} />}
-                        </div>
-                      )}
-                      {t.message && <p className="italic" style={{ fontSize: '1rem', lineHeight: 1.5, paddingRight: hostMode ? 48 : 0 }}>“{t.message}”</p>}
-                      <p className="text-xs uppercase tracking-widest mt-2" style={{ color: INK_SOFT }}>🍾 — {t.name}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
