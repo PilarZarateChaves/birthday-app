@@ -273,13 +273,13 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
           <div className="pt-7">
             {!bottlesOpen ? (
               <div>
-                {/* ocean cove with a bobbing bottle */}
-                <div className="relative overflow-hidden" style={{ height: 190, borderRadius: 10, border: `1px solid ${INK}`, background: 'linear-gradient(180deg,#d6eef7 0%,#a9d9ea 42%,#5fa9c4 100%)' }}>
+                {/* open ocean — fades out of the paper, no boxed border */}
+                <div className="relative overflow-hidden" style={{ height: 172, background: 'linear-gradient(180deg,#f4efe1 0%,#dbeef7 26%,#a9d9ea 58%,#76bcd2 100%)' }}>
                   <div style={{ position: 'absolute', top: -28, right: -12, width: 96, height: 96, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,233,150,0.95), transparent 68%)' }} />
-                  {[{ t: 16, l: '20%', s: 7, d: '0s' }, { t: 30, l: '74%', s: 6, d: '1s' }, { t: 60, l: '38%', s: 5, d: '0.6s' }, { t: 24, l: '54%', s: 5, d: '1.5s' }].map((sp, i) => (
+                  {[{ t: 30, l: '20%', s: 7, d: '0s' }, { t: 44, l: '74%', s: 6, d: '1s' }, { t: 66, l: '38%', s: 5, d: '0.6s' }, { t: 38, l: '54%', s: 5, d: '1.5s' }].map((sp, i) => (
                     <span key={i} style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle,#fff,rgba(255,255,255,0.5),transparent)', animation: `twinkle 2.8s ease-in-out ${sp.d} infinite` }} />
                   ))}
-                  <div style={{ position: 'absolute', left: 0, right: 0, top: 58, display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ position: 'absolute', left: 0, right: 0, top: 50, display: 'flex', justifyContent: 'center' }}>
                     <motion.div animate={{ y: [0, -8, 0], rotate: [-8, 8, -8] }} transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
                       style={{ filter: 'drop-shadow(0 8px 10px rgba(20,60,80,0.3))' }}>
                       <div style={{ transform: 'scale(1.35)', transformOrigin: 'center' }}><BottleGlyph /></div>
