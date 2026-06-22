@@ -279,10 +279,12 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
                   {[{ t: 16, l: '20%', s: 7, d: '0s' }, { t: 30, l: '74%', s: 6, d: '1s' }, { t: 60, l: '38%', s: 5, d: '0.6s' }, { t: 24, l: '54%', s: 5, d: '1.5s' }].map((sp, i) => (
                     <span key={i} style={{ position: 'absolute', top: sp.t, left: sp.l, width: sp.s, height: sp.s, borderRadius: '50%', background: 'radial-gradient(circle,#fff,rgba(255,255,255,0.5),transparent)', animation: `twinkle 2.8s ease-in-out ${sp.d} infinite` }} />
                   ))}
-                  <motion.div animate={{ y: [0, -9, 0], rotate: [-9, 9, -9] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                    style={{ position: 'absolute', left: '50%', top: 46, transform: 'translateX(-50%)', filter: 'drop-shadow(0 8px 10px rgba(20,60,80,0.3))' }}>
-                    <div style={{ transform: 'scale(1.5)' }}><BottleGlyph /></div>
-                  </motion.div>
+                  <div style={{ position: 'absolute', left: 0, right: 0, top: 58, display: 'flex', justifyContent: 'center' }}>
+                    <motion.div animate={{ y: [0, -8, 0], rotate: [-8, 8, -8] }} transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
+                      style={{ filter: 'drop-shadow(0 8px 10px rgba(20,60,80,0.3))' }}>
+                      <div style={{ transform: 'scale(1.35)', transformOrigin: 'center' }}><BottleGlyph /></div>
+                    </motion.div>
+                  </div>
                   <svg viewBox="0 0 120 30" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '200%', height: 46, animation: 'waveSlide 8s linear infinite', opacity: 0.85 }}>
                     <path d="M0 14 Q7.5 7 15 14 T30 14 T45 14 T60 14 T75 14 T90 14 T105 14 T120 14 V30 H0 Z" fill="#4f9bb8" />
                   </svg>
@@ -312,8 +314,8 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
                       style={{ position: 'absolute', width: 8, height: 8, borderRadius: i % 2 ? '50%' : 2, background: i % 3 === 0 ? '#c9a84c' : i % 3 === 1 ? '#ff7a59' : '#5fa9c4' }} />
                   })}
                 </div>
-                <motion.div initial={{ rotate: -25, y: -8, opacity: 0, scale: 0.7 }} animate={{ rotate: 0, y: 0, opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 11 }} className="flex justify-center">
-                  <div style={{ transform: 'scale(1.2)' }}><BottleGlyph /></div>
+                <motion.div initial={{ rotate: -25, y: -8, opacity: 0, scale: 0.7 }} animate={{ rotate: 0, y: 0, opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 11 }} className="flex justify-center mb-1">
+                  <BottleGlyph />
                 </motion.div>
                 <SectionHead title="Messages in a Bottle" />
                 <p className="text-center text-sm italic mb-4" style={{ color: INK_SOFT }}>Washed ashore from people who love you.</p>
@@ -416,12 +418,41 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
 }
 
 function BottleGlyph() {
+  // A real "message in a bottle": glass bottle floating on its side, corked,
+  // with a rolled parchment scroll inside and glass highlights.
   return (
-    <svg width="54" height="54" viewBox="0 0 54 54" fill="none" aria-hidden>
-      <path d="M23 5h8v6l3 5c1.4 2.3 2 4 2 7v18a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V23c0-3 .6-4.7 2-7l3-5V5Z" fill="#e9e2cf" stroke={INK} strokeWidth="1.6"/>
-      <rect x="22.5" y="2" width="9" height="5" rx="1" fill={INK}/>
-      <path d="M21 30h12v13a2 2 0 0 1-2 2H23a2 2 0 0 1-2-2V30Z" fill="#fffdf6" stroke={INK} strokeWidth="1.2"/>
-      <path d="M24 34h6M24 38h6" stroke={INK} strokeWidth="1.1" strokeLinecap="round"/>
+    <svg width="116" height="56" viewBox="0 0 116 56" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id="mbGlass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#c8ece2" />
+          <stop offset="0.55" stopColor="#86cdbd" />
+          <stop offset="1" stopColor="#57a695" />
+        </linearGradient>
+        <linearGradient id="mbCork" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#dca265" />
+          <stop offset="1" stopColor="#b3753a" />
+        </linearGradient>
+      </defs>
+
+      {/* glass body */}
+      <rect x="5" y="11" width="80" height="34" rx="17" fill="url(#mbGlass)" stroke="#2f7d6e" strokeWidth="2.2" />
+      {/* neck */}
+      <path d="M82 18 q8.5 1 11.5 4.2 v7.6 q-3 3.2 -11.5 4.2 Z" fill="url(#mbGlass)" stroke="#2f7d6e" strokeWidth="2.2" strokeLinejoin="round" />
+      {/* cork */}
+      <rect x="92.5" y="18.5" width="15" height="19" rx="3.5" fill="url(#mbCork)" stroke="#8a5a28" strokeWidth="1.6" />
+      <path d="M96.5 23.5 h7 M96.5 28 h7 M96.5 32.5 h7" stroke="#8a5a28" strokeWidth="1" strokeLinecap="round" opacity="0.45" />
+
+      {/* rolled parchment scroll inside */}
+      <rect x="22" y="19" width="40" height="18" rx="9" fill="#fff6e0" stroke="#e0c78f" strokeWidth="1.3" />
+      <path d="M31 26 h22 M31 31 h16" stroke="#c79a4e" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="22" cy="28" r="9" fill="#f4e6c2" stroke="#e0c78f" strokeWidth="1.3" />
+      <circle cx="62" cy="28" r="9" fill="#f4e6c2" stroke="#e0c78f" strokeWidth="1.3" />
+      <circle cx="22" cy="28" r="3.4" fill="none" stroke="#d8be86" strokeWidth="1.1" />
+      <circle cx="62" cy="28" r="3.4" fill="none" stroke="#d8be86" strokeWidth="1.1" />
+
+      {/* glass highlights */}
+      <path d="M13 16 q-4 12 1 24" stroke="#ffffff" strokeWidth="3.4" strokeLinecap="round" opacity="0.7" fill="none" />
+      <path d="M20 15 q-3 13 1 26" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.4" fill="none" />
     </svg>
   )
 }
