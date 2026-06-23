@@ -32,6 +32,16 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
   const [loading, setLoading] = useState(true)
   const [hidden, setHidden] = useState<string[]>([])
   const [bottlesOpen, setBottlesOpen] = useState(false)
+  const [printing, setPrinting] = useState(false)
+
+  function downloadPdf() {
+    setPrinting(true)
+    setBottlesOpen(true)
+    setTimeout(() => {
+      window.print()
+      setTimeout(() => setPrinting(false), 600)
+    }, 450)
+  }
 
   useEffect(() => {
     Promise.all([
@@ -146,8 +156,17 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
   ) : null
 
   return (
-    <main className="min-h-screen py-6 px-3" style={{ background: '#e7e0cf', fontFamily: body, color: INK }}>
-      <div className="max-w-2xl mx-auto" style={{ background: PAPER, boxShadow: '0 10px 50px rgba(0,0,0,0.18)', padding: '28px 22px' }}>
+    <main className="min-h-screen py-6 px-3 np-paper-wrap" style={{ background: '#e7e0cf', fontFamily: body, color: INK }}>
+      {/* Download as PDF — little button at the top */}
+      <div className="no-print max-w-2xl mx-auto flex justify-end mb-2">
+        <button onClick={downloadPdf}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold active:scale-95 transition-all"
+          style={{ background: INK, color: PAPER, boxShadow: '0 4px 14px rgba(0,0,0,0.25)' }}>
+          📄 {printing ? 'Preparing…' : 'Download PDF'}
+        </button>
+      </div>
+
+      <div className="max-w-2xl mx-auto np-paper" style={{ background: PAPER, boxShadow: '0 10px 50px rgba(0,0,0,0.18)', padding: '28px 22px' }}>
 
         {hostMode && (
           <div className="mb-4 px-3 py-2 rounded text-center text-xs" style={{ background: INK, color: PAPER }}>
@@ -322,7 +341,7 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
                 <div className="flex flex-col gap-4">
                   {visibleTributes.map((t, i) => (
                     <motion.div key={t.id}
-                      initial={{ opacity: 0, y: 34, scaleY: 0.5, rotate: i % 2 ? 2.5 : -2.5 }}
+                      initial={printing ? false : { opacity: 0, y: 34, scaleY: 0.5, rotate: i % 2 ? 2.5 : -2.5 }}
                       animate={{ opacity: 1, y: 0, scaleY: 1, rotate: i % 2 ? 1.4 : -1.4 }}
                       transition={{ duration: 0.55, delay: 0.3 + i * 0.16, ease: [0.16, 1, 0.3, 1] }}
                       className="relative px-4 py-4" style={{ transformOrigin: 'top center', border: `1px solid ${INK}`, background: '#fffdf6', boxShadow: '0 4px 14px rgba(42,38,32,0.12)' }}>
@@ -366,7 +385,7 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
             )}
 
             {visiblePhotos.length > 0 && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 np-photos">
                 {visiblePhotos.map((p, i) => {
                   const isHostPhoto = hostPhotoSet.has(p.url)
                   return (

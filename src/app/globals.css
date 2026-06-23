@@ -67,3 +67,37 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .marina-anim { animation: none !important; }
 }
+
+/* ── Print / Save-as-PDF for the birthday newspaper ── */
+@media print {
+  @page { margin: 14mm; }
+  .no-print { display: none !important; }
+  html, body { background: #ffffff !important; }
+  .np-paper-wrap { padding: 0 !important; background: #ffffff !important; }
+  .np-paper {
+    max-width: 100% !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  /* Photos expand to full width and print at full resolution */
+  .np-photos {
+    display: block !important;
+  }
+  .np-photos > figure {
+    width: 100% !important;
+    transform: none !important;
+    margin: 0 0 16px !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .np-photos img, .np-photos video {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: auto !important;
+    object-fit: contain !important;
+    filter: none !important;
+  }
+  /* Keep cards/sections from splitting across pages */
+  figure, li, .np-photos > figure { break-inside: avoid; }
+  .marina-anim { animation: none !important; }
+}
