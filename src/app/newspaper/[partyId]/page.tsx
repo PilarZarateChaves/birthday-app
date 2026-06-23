@@ -43,6 +43,25 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
     }, 450)
   }
 
+  async function downloadImage(url: string) {
+    const fallbackName = (url.split('/').pop() || 'photo').split('?')[0]
+    try {
+      const res = await fetch(url, { mode: 'cors' })
+      const blob = await res.blob()
+      const obj = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = obj
+      a.download = fallbackName
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(obj), 3000)
+    } catch {
+      // iOS Safari / CORS fallback: open full image so they can long-press → Save
+      window.open(url, '_blank')
+    }
+  }
+
   useEffect(() => {
     Promise.all([
       supabase.from('parties').select('*').eq('id', partyId).single(),
@@ -367,6 +386,7 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
         {(visiblePhotos.length > 0 || hostMode) && (
           <div className="pt-7">
             <SectionHead title="From the Voyage" />
+            <p className="no-print text-center text-xs italic mb-3" style={{ color: INK_SOFT }}>📥 Tap any photo to download it in full quality.</p>
 
             {hostMode && (
               <div className="mb-4">
@@ -398,9 +418,13 @@ function BirthdayNewspaper({ params }: { params: Promise<{ partyId: string }> })
                       <div className="relative" style={{ border: `1px solid ${INK}`, padding: 4, background: '#fff' }}>
                         {isVideo(p.url)
                           ? <video src={p.url} controls className="w-full aspect-square object-cover" style={{ display: 'block' }} />
-                          : <img src={p.url} alt="" className="w-full aspect-square object-cover" style={{ display: 'block', filter: 'saturate(0.95)' }} />}
+                          : <img src={p.url} alt="" onClick={() => downloadImage(p.url)} title="Download in full quality" className="w-full aspect-square object-cover" style={{ display: 'block', filter: 'saturate(0.95)', cursor: 'pointer' }} />}
+                        {/* tap-to-download badge */}
+                        <button onClick={() => downloadImage(p.url)} aria-label="Download photo"
+                          className="no-print absolute bottom-1.5 right-1.5 z-10 w-7 h-7 rounded-full flex items-center justify-center"
+                          style={{ background: 'rgba(42,38,32,0.78)', color: '#fff', fontSize: 13, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>⬇</button>
                         {p.mission && (
-                          <div style={{ position: 'absolute', left: 4, right: 4, bottom: 4, background: 'rgba(42,38,32,0.82)', color: '#f4efe1', padding: '4px 7px', fontSize: 9.5, lineHeight: 1.3, fontStyle: 'italic' }}>
+                          <div style={{ position: 'absolute', left: 4, right: 36, bottom: 4, background: 'rgba(42,38,32,0.82)', color: '#f4efe1', padding: '4px 7px', fontSize: 9.5, lineHeight: 1.3, fontStyle: 'italic' }}>
                             ✓ {p.mission}
                           </div>
                         )}
